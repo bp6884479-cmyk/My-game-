@@ -694,7 +694,7 @@ window._adminTab = "dash";
 function ensureAdmin(){
   if(!S.admin) S.admin = {
     forceColour: null,
-    autoRig: true,
+    autoRig: false,
     avMin: 1.2,
     avMax: 8.0,
     avForce: null,
@@ -985,6 +985,10 @@ function predFillCurrent(){
     }catch(e){ num.value = 0; }
   } else if(g==='chicken'||g==='ludo'){
     num.value = 'RNG';
+  } else if(g==='aviator'){
+    num.value = (typeof S!=='undefined' && S.avid) ? S.avid : Math.floor(now/15);
+  } else if(g==='axiator'){
+    num.value = (typeof S!=='undefined' && S.axid) ? S.axid : Math.floor(now/15);
   } else {
     num.value = Math.floor(now/15);
   }
@@ -1772,7 +1776,7 @@ window.adminChangePass = function(){
 };
 
 // Aviator crash helper
-window._adminCrash = function(original){
+window._adminCrash = function(original, key, rid){
   try{
     ensureAdmin();
     if(S.admin.avForce && S.admin.avForce > 1){
@@ -1783,9 +1787,18 @@ window._adminCrash = function(original){
     }
     const mn = S.admin.avMin || 1.2;
     const mx = S.admin.avMax || 8;
-    const r = Math.random();
-    return +(mn + (mx-mn) * Math.pow(r, 1.7)).toFixed(2);
-  }catch(e){ return original; }
+    const k = (key===2||key==='axiator')?2:(key===3||key==='cricket')?3:1;
+    const salt = k===1?17:k===2?31:53;
+    // Prefer round id; fall back to 15s time slot (matches Live Preview)
+    var slot;
+    if(rid!=null && isFinite(+rid)) slot = +rid;
+    else {
+      const t = Math.floor(Date.now()/1000);
+      slot = Math.floor(t/15);
+    }
+    const r = ((slot*9301*salt + 49297)%233280)/233280;
+    return +(mn + (mx-mn) * Math.pow(r, 1.65)).toFixed(2);
+  }catch(e){ return typeof original==='number'?original:1.5; }
 };
 
 const SUB={
@@ -1880,7 +1893,7 @@ function initK(){if(!T||R3)return;const el=$('kd'),W=el.clientWidth||320,H=el.cl
 const mats=[3,4,1,6,2,5].map(v=>new T.MeshStandardMaterial({map:dtex(v),roughness:.35}));[-2.4,0,2.4].forEach(x=>{const m=new T.Mesh(new T.BoxGeometry(1.5,1.5,1.5),mats);m.position.x=x;sc.add(m);DD.push({m,t:null,s:Math.random()*.1+.2})});
 const h=S.k3h[km][0];setDice(h?h.d:[r6(),r6(),r6()]);DD.forEach(o=>o.m.quaternion.copy(o.t));
 const loop=()=>{requestAnimationFrame(loop);if(!$('p-k3').classList.contains('on'))return;DD.forEach((o,i)=>{if(roll){o.m.rotation.x+=o.s;o.m.rotation.y+=o.s*1.3+i*.03}else o.m.quaternion.slerp(o.t,.12)});R3.render(sc,cam)};requestAnimationFrame(loop)}
-function settle(m,p){const d=[r6(),r6(),r6()],s=d[0]+d[1]+d[2],rec={p:kid(p,m),d,sum:s,sz:s>=11?'Big':'Small',oe:s%2?'Odd':'Even'};S.k3h[m].unshift(rec);S.k3h[m]=S.k3h[m].slice(0,500);let net=0,any=false,outs=[];
+function settle(m,p){const seed=p+1;const d=[((seed*3*17)%6)+1,((seed*7*17)%6)+1,((seed*11*17)%6)+1],s=d[0]+d[1]+d[2],rec={p:kid(p,m),d,sum:s,sz:s>=11?'Big':'Small',oe:s%2?'Odd':'Even'};S.k3h[m].unshift(rec);S.k3h[m]=S.k3h[m].slice(0,500);let net=0,any=false,outs=[];
 S.k3b.filter(b=>b.m==m&&b.p==p).forEach(b=>{any=true;let w=wins(b.k,d)?+(b.amt*b.mu).toFixed(2):0;if(w){S.bal+=w;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'K3 Reward',a:w,d:Date.now()})}net+=w-b.amt;outs.push({amt:b.amt,w});S.k3m.unshift({p:rec.p,pick:b.l,sum:s,amt:b.amt,w});S.st.n++;S.st.entry+=b.amt;S.st.won+=w;if(w)S.st.w++});
 S.k3b=S.k3b.filter(b=>!(b.m==m&&b.p==p));S.k3m=S.k3m.slice(0,100);S.tx=S.tx.slice(0,100);save();if(m==km){setDice(d);kh=Date.now()+1000;beep(1200,.6)}if(outs.length)setTimeout(()=>kpop(outs,d,rec,p),1100);if(false&&$('p-k3').classList.contains('on'))toast((net>=0?'Win +₹':'Loss −₹')+f2(Math.abs(net))+' · Sum '+s);render()}
 let kh=0,kl=0,kpT;
@@ -1929,7 +1942,7 @@ const sp=2*Math.tan(14*Math.PI/180)*6.4*(W/H)/5,TX=[];for(let n=0;n<10;n++)TX.pu
 for(let c=0;c<5;c++){const col={y:0,t:0,hold:0,ch:[]};for(let n=0;n<10;n++){const g=new T.Group(),b=new T.Mesh(new T.CylinderGeometry(.55,.55,.14,32),new T.MeshStandardMaterial({color:0xd9d9e4,metalness:.2,roughness:.5}));b.rotation.x=Math.PI/2;const f=new T.Mesh(new T.CircleGeometry(.55,32),new T.MeshBasicMaterial({map:TX[n][0]}));f.position.z=.071;g.add(b,f);g.position.x=(c-2)*sp;sc.add(g);col.ch.push({g,b,f,n})}CL.push(col)}
 const h=S.fdh[km][0];setD(h?h.d:[r10(),r10(),r10(),r10(),r10()],true);
 const loop=()=>{requestAnimationFrame(loop);if(!$('p-5d').classList.contains('on'))return;const now=Date.now();CL.forEach((c,i)=>{const rl=roll||now<c.hold;if(rl)c.y+=.4+i*.02;else{const df=((c.t-c.y)%12+12)%12;c.y+=df<.01?df:df*.18}c.ch.forEach(o=>{let r=((o.n*1.2-c.y)%12+12)%12;if(r>6)r-=12;o.g.position.y=r;o.g.visible=Math.abs(r)<2.1;const gr=!rl&&Math.abs(r)<.2;o.b.material.color.setHex(gr?0x17a85a:0xd9d9e4);o.f.material.map=TX[o.n][gr?1:0]})});R5.render(sc,cam)};requestAnimationFrame(loop)}
-function settle(m,p){const d=[r10(),r10(),r10(),r10(),r10()],s=d.reduce((a,b)=>a+b,0),rec={p:kid(p,m),d,sum:s,sz:s>=23?'Big':'Small',oe:s%2?'Odd':'Even'};S.fdh[m].unshift(rec);S.fdh[m]=S.fdh[m].slice(0,500);const outs=[];
+function settle(m,p){const seed=p+1;const d=[];for(let i=0;i<5;i++)d.push((seed*(i+2)*13+i*7)%10);const s=d.reduce((a,b)=>a+b,0),rec={p:kid(p,m),d,sum:s,sz:s>=23?'Big':'Small',oe:s%2?'Odd':'Even'};S.fdh[m].unshift(rec);S.fdh[m]=S.fdh[m].slice(0,500);const outs=[];
 S.fdb.filter(b=>b.m==m&&b.p==p).forEach(b=>{const w=wins(b.k,d)?+(b.amt*b.mu).toFixed(2):0;if(w){S.bal+=w;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'5D Reward',a:w,d:Date.now()})}outs.push({amt:b.amt,w});S.fdm.unshift({p:rec.p,pick:b.l,res:d.join(''),amt:b.amt,w});S.st.n++;S.st.entry+=b.amt;S.st.won+=w;if(w)S.st.w++});
 S.fdb=S.fdb.filter(b=>!(b.m==m&&b.p==p));S.fdm=S.fdm.slice(0,100);S.tx=S.tx.slice(0,100);save();if(m==km){setD(d);kh=Date.now()+1000;beep(1200,.6)}if(outs.length)setTimeout(()=>fpop(outs,rec),1100);render()}
 function fpop(o,rec){const win=o.reduce((a,x)=>a+x.w,0),ent=o.reduce((a,x)=>a+x.amt,0),net=win-ent,s=rec.sum;let t=3;const dr=()=>{$('pc').className='pc'+(win?'':' l');$('pcb').innerHTML=`<h2>${win?'Congratulations on your winning':'Better luck next time'}</h2><div class="rs"><span>Sum ${s}</span><span>${rec.sz}</span><span>${rec.oe}</span></div><div style="margin-bottom:12px">${rec.d.map(v=>`<span class="rb" style="background:#fff;color:#2b3270;border-color:#fff">${v}</span>`).join('')}</div><div class="bn">${win?'Reward':'Loss'}<b>₹${f2(win?win:ent)}</b><small style="color:inherit">Entry ${ent} · Net ${net>=0?'+':''}${f2(net)}</small></div><small>Period ${rec.p}</small><small>${t}s auto close</small>`};$('pc').innerHTML='<div id="cv6"></div><div id="pcb"></div>';dr();$('pop').classList.add('on');fx3d(win,s%10,colOf(s%10));clearInterval(pT);clearInterval(kpT);kpT=setInterval(()=>{t--;if(t<=0){clearInterval(kpT);closeP()}else dr()},1000)}
@@ -1974,7 +1987,7 @@ const ST=(()=>{let md='mix',left=0;const rn=n=>Math.floor(Math.random()*n);retur
 const SL=[0,1].map(()=>({amt:10,auto:0,status:'idle',mult:0,pay:0,tx:'',q:0}));SL.forEach((s,i)=>{s.q=+((S.avq||[])[i])||0});const SQ=()=>{S.avq=SL.map(x=>x.q)};
 const tid=()=>'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const canBet=()=>st=='WAITING'||st=='COUNTDOWN'||st=='RESULT';
-function newRound(){rid=++S.avid;{const s1=rseed(),s2=rseed(),c1=crashOf(s1,rid),c2=crashOf(s2,rid),md=ST.next(),p1=md==='good'?c1>=c2:md==='bad'?c1<=c2:true;seed=p1?s1:s2;crash=_adminCrash(p1?c1:c2);commit=sha(seed)}cdEnd=Date.now()+CDMS;m=1;st='COUNTDOWN';genBots();
+function newRound(){rid=++S.avid;{const s1=rseed(),s2=rseed(),c1=crashOf(s1,rid),c2=crashOf(s2,rid),md=ST.next(),p1=md==='good'?c1>=c2:md==='bad'?c1<=c2:true;seed=p1?s1:s2;crash=_adminCrash(p1?c1:c2,1,rid);commit=sha(seed)}cdEnd=Date.now()+CDMS;m=1;st='COUNTDOWN';genBots();
 SL.forEach(s=>{if(s.status=='cashed'||s.status=='lost'){s.status='idle';s.pay=0;s.mult=0}});SL.forEach((s,i)=>{if(s.q>0){s.amt=s.q;s.q=0;s.status='placed';s.mult=0;s.pay=0;try{$('avamt'+i).value=s.amt}catch(e){}}});SQ();save();uiAll()}
 function settleCrash(){st='CRASHED';try{if(sec.classList.contains('on')&&Date.now()-(t0+Math.log(crash)/K)<1500)avCrashSnd()}catch(e){}crashAt=Date.now();m=crash;
 SL.forEach((s,i)=>{if(s.status=='placed'){s.status='lost';s.mult=0;s.pay=0;S.avm.unshift({id:rid,amt:s.amt,x:0,w:0,t:Date.now()})}});
@@ -2109,7 +2122,7 @@ const ST=(()=>{let md='mix',left=0;const rn=n=>Math.floor(Math.random()*n);retur
 const SL=[0,1].map(()=>({amt:10,auto:0,status:'idle',mult:0,pay:0,tx:'',q:0}));SL.forEach((s,i)=>{s.q=+((S.axq||[])[i])||0});const SQ=()=>{S.axq=SL.map(x=>x.q)};
 const tid=()=>'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const canBet=()=>st=='WAITING'||st=='COUNTDOWN'||st=='RESULT';
-function newRound(){rid=++S.axid;{const s1=rseed(),s2=rseed(),c1=crashOf(s1,rid),c2=crashOf(s2,rid),md=ST.next(),p1=md==='good'?c1>=c2:md==='bad'?c1<=c2:true;seed=p1?s1:s2;crash=p1?c1:c2;commit=sha(seed)}cdEnd=Date.now()+CDMS;m=1;st='COUNTDOWN';genBots();
+function newRound(){rid=++S.axid;{const s1=rseed(),s2=rseed(),c1=crashOf(s1,rid),c2=crashOf(s2,rid),md=ST.next(),p1=md==='good'?c1>=c2:md==='bad'?c1<=c2:true;seed=p1?s1:s2;crash=_adminCrash(p1?c1:c2,2,rid);commit=sha(seed)}cdEnd=Date.now()+CDMS;m=1;st='COUNTDOWN';genBots();
 SL.forEach(s=>{if(s.status=='cashed'||s.status=='lost'){s.status='idle';s.pay=0;s.mult=0}});SL.forEach((s,i)=>{if(s.q>0){s.amt=s.q;s.q=0;s.status='placed';s.mult=0;s.pay=0;try{$('axamt'+i).value=s.amt}catch(e){}}});SQ();save();uiAll()}
 function settleCrash(){st='CRASHED';try{if(sec.classList.contains('on')&&Date.now()-(t0+Math.log(crash)/K)<1500)avCrashSnd()}catch(e){}crashAt=Date.now();m=crash;
 SL.forEach((s,i)=>{if(s.status=='placed'){s.status='lost';s.mult=0;s.pay=0;S.axm.unshift({id:rid,amt:s.amt,x:0,w:0,t:Date.now()})}});
