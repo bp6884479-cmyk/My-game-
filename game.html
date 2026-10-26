@@ -1,3 +1,5 @@
+
+</body></html>
 <!DOCTYPE html>
 <html lang="hi"><head><meta charset="utf-8">
 <script>try{if(!sessionStorage.getItem("ctp_ready"))location.replace("./")}catch(e){}</script>
@@ -708,6 +710,108 @@ function ensureAdmin(){
   if(!S.tx) S.tx = [];
 }
 
+
+/* ===== LIVE PREVIEW (1 min early) ===== */
+window._preview = window._preview || {};
+
+function getNextColourResult(){
+  try{
+    ensureAdmin();
+    // Use current mode periods
+    const modes = [30,60,180,300];
+    const out = {};
+    modes.forEach(m=>{
+      const now = Math.floor(Date.now()/1000);
+      const cur = Math.floor(now / m);
+      const nextP = cur + 1;
+      // seconds left in current round
+      const left = m - (now % m);
+      let n;
+      if(S.admin && S.admin.forceColour !== null && S.admin.forceColour !== undefined){
+        n = S.admin.forceColour;
+      } else {
+        // use same resN logic for next period
+        n = (typeof resN === "function") ? resN(m, nextP) : Math.floor(Math.random()*10);
+      }
+      const sz = n >= 5 ? "Big" : "Small";
+      let c = [];
+      if(n === 0) c = ["Red","Violet"];
+      else if(n === 5) c = ["Green","Violet"];
+      else if([1,3,7,9].includes(n)) c = ["Green"];
+      else c = ["Red"];
+      out[m] = {n, sz, c: c.join("+"), left, period: nextP};
+    });
+    return out;
+  }catch(e){ return {}; }
+}
+
+function getNextAviatorCrash(){
+  try{
+    ensureAdmin();
+    if(S.admin.avForce && S.admin.avForce > 1) return S.admin.avForce;
+    const mn = S.admin.avMin || 1.2;
+    const mx = S.admin.avMax || 8;
+    // deterministic-ish preview for next
+    const t = Math.floor(Date.now()/30000); // changes every 30s
+    const r = ((t * 9301 + 49297) % 233280) / 233280;
+    return +(mn + (mx-mn) * Math.pow(r, 1.7)).toFixed(2);
+  }catch(e){ return 2.00; }
+}
+
+function buildPreviewHTML(){
+  const col = getNextColourResult();
+  const av = getNextAviatorCrash();
+  let html = `<div style="background:#12163d;border-radius:12px;padding:14px;margin-bottom:12px">
+    <b style="color:#ffd23f">🔮 Live Preview (Next Results)</b>
+    <div style="font-size:11px;opacity:.6;margin:4px 0 10px">1 minute pehle result yahan dikhega</div>`;
+
+  // Colour Trading
+  html += `<div style="margin-bottom:12px"><b>🎨 Colour Trading (Win Go)</b>`;
+  [30,60,180,300].forEach(m=>{
+    const r = col[m];
+    if(!r) return;
+    const label = m===30?"30s":m===60?"1 Min":m===180?"3 Min":"5 Min";
+    const urgent = r.left <= 60;
+    html += `<div style="background:${urgent?"#2a1a0a":"#0a0f3d"};border-radius:10px;padding:10px;margin-top:6px;border:1px solid ${urgent?"#ff8a2a":"#ffffff15"}">
+      <div style="display:flex;justify-content:space-between;font-size:13px">
+        <span>${label}</span>
+        <span style="color:${urgent?"#ff8a2a":"#9aa3d8"}">${r.left}s left</span>
+      </div>
+      <div style="font-size:20px;font-weight:900;margin-top:4px">
+        <span style="color:#ffd23f">${r.n}</span> &nbsp;
+        <span style="color:#4be08a">${r.sz}</span> &nbsp;
+        <span>${r.c}</span>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // K3 / 5D simple preview (random-ish based on time for now)
+  const t = Math.floor(Date.now()/1000);
+  const k3 = [(t%6)+1, ((t*3)%6)+1, ((t*7)%6)+1];
+  const d5 = [(t%10), ((t*2)%10), ((t*3)%10), ((t*5)%10), ((t*7)%10)];
+  html += `<div style="margin-bottom:12px"><b>🎲 K3 Next</b>
+    <div style="background:#0a0f3d;border-radius:10px;padding:12px;margin-top:6px;font-size:22px;font-weight:900;letter-spacing:8px;text-align:center">
+      ${k3.join("  ")}
+    </div></div>`;
+
+  html += `<div style="margin-bottom:12px"><b>🔢 5D Next</b>
+    <div style="background:#0a0f3d;border-radius:10px;padding:12px;margin-top:6px;font-size:22px;font-weight:900;letter-spacing:8px;text-align:center">
+      ${d5.join("  ")}
+    </div></div>`;
+
+  // Aviator
+  html += `<div><b>✈️ Aviator Next Crash</b>
+    <div style="background:linear-gradient(135deg,#1a2a6a,#0a0f3d);border-radius:12px;padding:16px;margin-top:6px;text-align:center">
+      <div style="font-size:36px;font-weight:900;color:#ffd23f">${av}x</div>
+      <div style="font-size:12px;opacity:.6;margin-top:4px">Next round crash point</div>
+    </div></div>`;
+
+  html += `</div>
+  <button onclick="showAdminUI()" style="width:100%;background:#2f8cff;border:0;color:#fff;padding:10px;border-radius:8px;margin-top:4px">🔄 Refresh Preview</button>`;
+  return html;
+}
+
 window.openAdmin = function(){
   ensureAdmin();
   const pass = prompt("Admin Password:");
@@ -747,6 +851,7 @@ function showAdminUI(){
 
   const tabs = [
     ["dash","📊 Dashboard"],
+    ["preview","🔮 Live Preview"],
     ["users","👤 Users"],
     ["dep","⬇️ Deposits"],
     ["wd","⬆️ Withdrawals"],
@@ -757,7 +862,10 @@ function showAdminUI(){
   let body = "";
 
   // DASHBOARD
-  if(_adminTab==="dash"){
+  if(_adminTab==="preview"){
+    body = buildPreviewHTML();
+  }
+  else if(_adminTab==="dash"){
     body = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div style="background:linear-gradient(135deg,#2f8cff,#1a4a9a);border-radius:14px;padding:14px">
@@ -4313,5 +4421,13 @@ window.Ludo={open:start,close,config:CFG,_t:{legal:(s,r)=>G&&legal(s,r),victims:
     }
   });
 })();
+</script>
+<script>
+// Auto refresh live preview
+setInterval(function(){
+  if(_adminOpen && _adminTab === "preview"){
+    try{ showAdminUI(); }catch(e){}
+  }
+}, 5000);
 </script>
 </body></html>
