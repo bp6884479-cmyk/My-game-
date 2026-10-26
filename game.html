@@ -820,6 +820,36 @@ function buildPreviewHTML(){
   ];
 
   var html='<div style="margin-bottom:8px;font-size:12px;opacity:.65">⏱ Live hard countdown • har second</div>';
+  var minesLive=null, rouletteLive=null;
+  try{if(window.MinesPro&&typeof window.MinesPro.getLive==='function') minesLive=window.MinesPro.getLive();}catch(e){}
+  try{if(window.Roulette&&typeof window.Roulette.getLive==='function') rouletteLive=window.Roulette.getLive();}catch(e){}
+
+  // BOMB PRO / MINES PRO
+  if(minesLive){
+    html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">💣 Bomb Pro / Mines Pro</b>';
+    html+='<div style="background:#0a0f3d;border:1px solid #ffffff18;border-radius:12px;padding:12px;margin-top:8px">';
+    html+='<div style="display:flex;justify-content:space-between;gap:10px"><b>Round status</b><span style="'+_tickStyle(minesLive.left)+'">'+minesLive.left+'s</span></div>';
+    html+='<div style="margin-top:7px;font-size:14px">'+minesLive.stage+' · '+minesLive.mines+' bombs / '+minesLive.totalTiles+' tiles</div>';
+    html+='</div></div>';
+  }
+
+  // ROULETTE
+  if(rouletteLive){
+    var rouletteColor=rouletteLive.result===null?'#ffffff':(rouletteLive.result===0?'#4be08a':'#ffd23f');
+    html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🎰 European Roulette</b>';
+    html+='<div style="background:#0a0f3d;border:1px solid #ffffff18;border-radius:12px;padding:12px;margin-top:8px">';
+    html+='<div style="display:flex;justify-content:space-between;gap:10px"><b>'+rouletteLive.stage+'</b>';
+    if(rouletteLive.left!==null) html+='<span style="'+_tickStyle(rouletteLive.left)+'">'+rouletteLive.left+'s</span>';
+    html+='</div>';
+    if(rouletteLive.result!==null){
+      var rN=rouletteLive.result, rColor=rN===0?'Green':([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].indexOf(rN)>=0?'Red':'Black');
+      html+='<div style="margin-top:8px;font-size:24px;font-weight:900;color:'+rouletteColor+'">'+rN+' · '+rColor+'</div>';
+      if(!rouletteLive.active) html+='<div style="font-size:11px;opacity:.65;margin-top:3px">Last result · Roulette is not open</div>';
+    } else {
+      html+='<div style="margin-top:8px;font-size:13px;opacity:.75">Result appears when the spin starts.</div>';
+    }
+    html+='</div></div>';
+  }
 
   // COLOUR
   html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🎨 Colour Trading</b>';
@@ -3175,7 +3205,17 @@ ctx2.save();ctx2.translate(cx,cy);ctx2.rotate(-b.w);ctx2.drawImage(texC,-1.55*s,
 /* ---------- open / close ---------- */
 function openR(){S.rlh=S.rlh||[];{S.rlp=S.rlp||[];while(S.rlp.length<S.rlh.length)S.rlp.push('-');const now=Date.now(),n=Math.min(30,Math.floor((now-(S.rlt||now))/30000));for(let i=n;i>0;i--){const t=now-i*30000,d=new Date(t),p=Math.floor(t/30000);S.rlh.unshift(r37());S.rlp.unshift(d.getUTCFullYear()+String(d.getUTCMonth()+1).padStart(2,'0')+String(d.getUTCDate()).padStart(2,'0')+'R'+String(p%100000).padStart(6,'0'))}while(S.rlh.length<50){const t=now-(S.rlh.length+1)*30000,d=new Date(t),p=Math.floor(t/30000);S.rlh.push(r37());S.rlp.push(d.getUTCFullYear()+String(d.getUTCMonth()+1).padStart(2,'0')+String(d.getUTCDate()).padStart(2,'0')+'R'+String(p%100000).padStart(6,'0'))}S.rlh=S.rlh.slice(0,50);S.rlp=S.rlp.slice(0,50);S.rlt=now;try{save()}catch(e){}}S.rlb=S.rlb||{};if(!S.st)S.st={n:0,w:0,entry:0,won:0};open=true;$$('rl').classList.add('rl-on');if(S.rlh.length)ballIdx=ORDER.indexOf(S.rlh[0]);init3d();W0=0;lastV=true;newRound();lastWin=0;paint();clearInterval(tmr);tmr=setInterval(tick,200);cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);$$('rl').scrollTop=0}
 function close(){if(phase=='spin')finishSpin();else if(phase=='bet'&&tot()){S.bal=r2(S.bal+tot());bets={};undo=[];sv()}open=false;$$('rl').classList.remove('rl-on');clearInterval(tmr);cancelAnimationFrame(raf);try{show('home')}catch(e){}}
-window.Roulette={open:openR,close,_t:{mult,ORDER}};
+function getLive(){
+  const now=Date.now();
+  if(!open){
+    const last=(S.rlh||[])[0];
+    return {active:false,stage:'Not open',left:null,result:(last===undefined?null:last)};
+  }
+  if(phase==='bet') return {active:true,stage:'Betting',left:Math.max(0,Math.ceil((endAt-now)/1000)),result:null};
+  if(phase==='spin') return {active:true,stage:'Spinning',left:Math.max(0,Math.ceil(SPIN_T-(performance.now()-spin.t0)/1000)),result:res};
+  return {active:true,stage:'Result',left:Math.max(0,Math.ceil((endAt-now)/1000)),result:res};
+}
+window.Roulette={open,close,getLive,_t:{mult,ORDER}};
 })();
 </script>
 
@@ -4134,7 +4174,17 @@ SL.forEach((s,i)=>{if(s.queued){wal(s.stake,'Mines Pro Refund');s.queued=0}
 if(s.active&&!s.settled){if(C&&!C.busted&&!C.done&&C.n>0)cash(i,1);else if(C&&now<C.r.cd)wal(s.stake,'Mines Pro Refund');else if(C&&!C.busted&&!C.done)wal(s.stake,'Mines Pro Refund')}
 s.active=0;s.stake=0;s.ap.on=0;s.ap.left=0});
 isOpen=0;clearInterval(tm);closeSh();root.classList.remove('on','hv');$('mpHp').classList.remove('on');document.body.style.overflow='';C=null;try{window.show('home')}catch(e){try{render()}catch(_){}}}
-window.MinesPro={open,close,config:CFG,ladder,_x:closeSh,
+function getLive(){
+  const now=Date.now();
+  st();
+  const r=sched(now);
+  let stage,until;
+  if(now<r.cd){stage='Betting';until=r.cd;}
+  else if(now<r.ct){stage='Running';until=r.ct;}
+  else{stage='Result';until=r.e;}
+  return {stage,left:Math.max(0,Math.ceil((until-now)/1000)),mines:r.m,totalTiles:T};
+}
+window.MinesPro={open,close,config:CFG,ladder,_x:closeSh,getLive,
 _a:i=>{const r=Math.floor(+$('apR').value),t=Math.floor(+$('apT').value);if(!(r>=1&&r<=500&&t>=1&&t<=21))return toast('Rounds 1–500, tiles 1–21');SL[i].ap={on:1,left:r,rounds:r,tiles:t};closeSh();toast('Auto Play agle round se shuru');ui()}};
 })();
 </script>
