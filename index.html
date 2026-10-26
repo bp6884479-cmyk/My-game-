@@ -124,19 +124,21 @@ var stored=false;try{stored=Object.keys(localStorage).some(function(k){return k.
 var hasAuth=/access_token=|[?&]code=/.test(location.hash+location.search);
 var em=(location.hash+"&"+location.search).match(/error_description=([^&]+)/);
 if(!stored&&!hasAuth){hideLoad();setTimeout(startLogo,30);setTimeout(prefetch,2000);return}
-setTimeout(function(){if(document.documentElement.className==="chk"){hideLoad();msg("Server slow hai, dobara try karo");setTimeout(startLogo,30)}},hasAuth?26000:12000);
-var authP=null;
-if(hasAuth){authP=new Promise(function(res){var done=false;try{SB.auth.onAuthStateChange(function(ev,ss){if(ss&&!done){done=true;res(ss)}})}catch(e){}setTimeout(function(){if(!done){done=true;res(null)}},20000)})}
-var s=null,err=false;
-try{s=(await T(SB.auth.getSession(),hasAuth?12000:3500)).data.session}catch(e){err=true}
-if(!s&&hasAuth){s=await authP}
+setTimeout(function(){if(document.documentElement.className==="chk"){hideLoad();msg("Server slow hai, dobara try karo");setTimeout(startLogo,30)}},hasAuth?45000:12000);
+var s=null,err=false,setErr="";
+var hp=new URLSearchParams(location.hash.replace(/^#/,"")),at=hp.get("access_token"),rt=hp.get("refresh_token");
+if(hasAuth&&at&&rt){try{var rr=await T(SB.auth.setSession({access_token:at,refresh_token:rt}),12000);if(rr.data&&rr.data.session)s=rr.data.session;else setErr=(rr.error&&rr.error.message)||"setSession fail"}catch(e){setErr=String(e&&e.message||e)}}
+if(!s){var authP=null;
+if(hasAuth){authP=new Promise(function(res){var done=false;try{SB.auth.onAuthStateChange(function(ev,ss){if(ss&&!done){done=true;res(ss)}})}catch(e){}setTimeout(function(){if(!done){done=true;res(null)}},8000)})}
+try{s=(await T(SB.auth.getSession(),hasAuth?6000:3500)).data.session}catch(e){err=true}
+if(!s&&hasAuth){s=await authP}}
 if(s){if(ready&&s.user.id===ready)go();else loadAndStart(s);return}
 if(err&&ready){go();return}
 try{sessionStorage.removeItem("ctp_ready")}catch(e){}
 hideLoad();setTimeout(startLogo,30);setTimeout(prefetch,2000);
 var raw=(location.search+location.hash).replace(/(access_token|refresh_token|code)=[^&]+/g,"$1=...");
 if(hasAuth){try{history.replaceState(null,"",location.pathname)}catch(e){}}
-if(em)msg(decodeURIComponent(em[1].replace(/\+/g," ")));else if(hasAuth)msg("Google login fail. Screenshot bhejo: "+raw.slice(0,160)+" | stored="+stored)
+if(em)msg(decodeURIComponent(em[1].replace(/\+/g," ")));else if(hasAuth)msg("Google login fail. Screenshot bhejo: "+raw.slice(0,40)+" | err="+setErr)
 }catch(e){hideLoad();msg(String(e&&e.message||e))}
 }
 document.addEventListener("DOMContentLoaded",boot);
