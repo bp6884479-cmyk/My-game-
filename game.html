@@ -370,7 +370,7 @@ nav .wh span{background:linear-gradient(180deg,#8a4fff,#4a2ad8)!important;color:
 <section class="pg" id="p-promo"><div class="card"><h3>Invite friends</h3><p class="note" style="text-align:left">Apna Player ID share karein aur referral rewards kamao.</p><div class="uidp">ID <span style="opacity:.6">|</span> <span id="pmU"></span></div><button style="width:100%;margin-top:6px" onclick="cpUid()">Copy ID</button></div></section>
 </main>
 
-<nav><button class="on" onclick="show('home')"><canvas data-i="nhome" width="128" height="128"></canvas>Home</button><button onclick="show('act')"><canvas data-i="nact" width="128" height="128"></canvas>Activity</button><div></div><button onclick="show('promo')"><canvas data-i="npro" width="128" height="128"></canvas>Promotion</button><button onclick="show('acc')"><canvas data-i="nacc" width="128" height="128"></canvas>Account</button></nav>
+<nav><button class="on" onclick="show('home')"><canvas data-i="nhome" width="128" height="128"></canvas>Home</button><button onclick="show('act')"><canvas data-i="nact" width="128" height="128"></canvas>Activity</button><button onclick="window.open('https://t.me/Luffyxzoroa','_blank','noopener,noreferrer')"><canvas data-i="tg" width="128" height="128"></canvas>Help</button><button onclick="show('promo')"><canvas data-i="npro" width="128" height="128"></canvas>Promotion</button><button onclick="show('acc')"><canvas data-i="nacc" width="128" height="128"></canvas>Account</button></nav>
 
 <div class="sheet" id="sh"><div>
  <div id="cv4"></div><div class="shH" id="shH"><small id="shW">WinGo 30sec</small><div class="sp" id="shT"></div></div>
@@ -576,7 +576,7 @@ function init3d(){const el=$('cv3');
 $('base').innerHTML=[1,10,100,1000].map(v=>`<button onclick="base=${v};upd()" data-b="${v}">${v}</button>`).join('');
 $('mul').innerHTML=[1,5,10,20,50,100].map(v=>`<button onclick="mul=${v};upd()" data-m="${v}">X${v}</button>`).join('');
 function toast(m){const t=$('ts');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',2200)}
-function show(p){document.querySelectorAll('.pg').forEach(e=>e.classList.remove('on'));$('p-'+p).classList.add('on');if(p=='game')init3d();const m={home:0,game:0,act:1,promo:2,acc:3};document.querySelectorAll('nav button').forEach((b,i)=>b.classList.toggle('on',i==(m[p]??3)));render()}
+function show(p){document.querySelectorAll('.pg').forEach(e=>e.classList.remove('on'));$('p-'+p).classList.add('on');if(p=='game')init3d();const m={home:0,game:0,act:1,promo:3,acc:4};document.querySelectorAll('nav button').forEach((b,i)=>b.classList.toggle('on',i==(m[p]??3)));render()}
 function setMode(m){mode=m;pg=0;S.hist[m]=S.hist[m]||[];$('m30').classList.toggle('on',m==30);$('m60').classList.toggle('on',m==60);$('m180').classList.toggle('on',m==180);$('m300').classList.toggle('on',m==300);tick(true)}
 function tab(n){tabN=n;$('t1').classList.toggle('on',n==1);$('t2').classList.toggle('on',n==2);$('t3').classList.toggle('on',n==3);render()}
 const per=(m=mode)=>Math.floor(Date.now()/1000/m);
