@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="hi"><head><meta charset="utf-8">
-<script>try{if(!sessionStorage.getItem("ctp_ready"))location.replace("./")}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 (function(){
@@ -20,10 +19,35 @@ function wipe(){try{Object.keys(localStorage).forEach(function(k){if(k.indexOf("
 function T(p,ms){return Promise.race([p,new Promise(function(_,rj){setTimeout(function(){rj(new Error("timeout"))},ms)})])}
 async function save(){try{var s=(await T(SB.auth.getSession(),5000)).data.session;if(!s)return;var o=snap(),j=JSON.stringify(o);if(j===last)return;last=j;
 var r=await T(SB.from("game_saves").upsert({user_id:s.user.id,data:o,updated_at:new Date().toISOString()},{onConflict:"user_id"}),8000);if(r.error){last="";note("Save error: "+r.error.message)}else if(!note.ok){note.ok=1;note("Cloud save OK")}}catch(e){last="";note("Save error: "+(e&&e.message||e))}}
-async function loadAndStart(s){showLoad("Signing in... Loading game");var r={},ok=false;try{r=await T(SB.from("game_saves").select("data").eq("user_id",s.user.id).maybeSingle(),6000);ok=!r.error}catch(e){r={}}
-if(ok){clearG();if(r.data&&r.data.data){var d=r.data.data;for(var k in d)localStorage.setItem(k,d[k])}}
-sessionStorage.setItem("ctp_ready",s.user.id);history.replaceState(null,"",location.pathname);location.reload()}
-function msg(t){document.getElementById("ctpErr").textContent=t}
+async function loadAndStart(s){
+  showLoad("Signing in... Loading game");
+  var r = {}, ok = false;
+  try {
+    r = await T(SB.from("game_saves").select("data").eq("user_id", s.user.id).maybeSingle(), 12000);
+    ok = !r.error;
+  } catch(e) {
+    r = {};
+  }
+  if(ok && r.data && r.data.data){
+    clearG();
+    var d = r.data.data;
+    for(var k in d) localStorage.setItem(k, d[k]);
+  }
+  sessionStorage.setItem("ctp_ready", s.user.id);
+  // Clean url hash without re-triggering replace
+  if(window.history && window.history.replaceState){
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  hideLoad();
+  var hideStyle = document.getElementById("ctp_hide");
+  if(hideStyle) hideStyle.remove();
+  var loginEl = document.getElementById("ctpLogin");
+  if(loginEl) loginEl.remove();
+  last = JSON.stringify(snap());
+  setInterval(save, 10000);
+  addEventListener("pagehide", save);
+  document.addEventListener("visibilitychange", save);
+}
 function ui(){hideLoad();var d=document.createElement("div");d.id="ctpLogin";
 d.innerHTML='<style>#ctpLogin .w{position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at 50% 20%,#3b41e6 0,#1a1fa8 40%,#0a0f3d 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#fff;padding:16px;overflow:auto}#ctpLogin .tag{position:absolute;top:18px;right:18px;font-size:13px;font-weight:600;text-align:center}#ctpLogin .lg{width:100%;max-width:360px;height:230px;position:relative}#ctpLogin .lg canvas{width:100%;height:100%;display:block;touch-action:none}#ctpLogin .fb{font:900 40px/1.1 system-ui,sans-serif;text-align:center;color:#ffd23f;padding-top:50px}#ctpLogin .pt{letter-spacing:5px;font-weight:700;font-size:14px;margin:4px 0 18px}#ctpLogin .pt i{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 12px;vertical-align:middle}#ctpLogin .bx{width:100%;max-width:360px;background:#0d1550e6;border:2px solid #3fa0ff99;border-radius:24px;padding:20px 16px;box-shadow:0 0 30px #2f8cff55}#ctpLogin .bt{width:100%;display:flex;align-items:center;gap:14px;border:0;border-radius:18px;padding:14px 18px;margin-bottom:14px;text-align:left;cursor:pointer;box-shadow:0 5px 0 #0005}#ctpLogin .bt b{display:block;font-size:20px;font-weight:800}#ctpLogin .bt small{font-size:13px;opacity:.7;font-weight:600}#ctpLogin .bt span.t{flex:1}#ctpLogin .bt em{font-style:normal;font-size:24px;font-weight:700}#ctpLogin .gu{background:linear-gradient(180deg,#ffd23f,#f5a10c);color:#111}#ctpLogin .go{background:linear-gradient(180deg,#fff,#dde3f5);color:#111}#ctpLogin .ic{width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:30px}#ctpLogin .ft{display:flex;justify-content:space-between;font-size:11px;text-align:center;margin-top:4px}#ctpLogin .ft div{flex:1}#ctpLogin .ft div i{display:block;font-style:normal;font-size:22px;margin-bottom:4px}#ctpLogin .gl{letter-spacing:5px;font-weight:700;font-size:13px;margin-top:18px}#ctpErr{color:#ffb4b4;font-size:13px;text-align:center;min-height:16px;margin-top:6px}</style>'+
 '<div class="w"><div class="tag">👑<br>— Trade Colours —<br>Win Big</div><div class="lg" id="ctpLogo3d"></div><div class="pt">PREDICT<i style="background:#ff3b3b"></i>TRADE<i style="background:#2ee06a"></i>WIN</div>'+
@@ -31,7 +55,7 @@ d.innerHTML='<style>#ctpLogin .w{position:fixed;inset:0;z-index:99999;background
 '<button id="ctpGo" class="bt go"><span class="ic"><svg width="32" height="32" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg></span><span class="t"><b>Login with Google</b><small>Fast &amp; Secure</small></span><em>›</em></button>'+
 '<div class="ft"><div><i>🛡️</i>Safe &amp; Secure</div><div><i>⚡</i>Fast Gameplay</div><div><i>📊</i>Real Strategy</div><div><i>🏆</i>Be the Best</div></div><p id="ctpErr"></p></div><div class="gl">— GOOD LUCK! —</div></div>';
 document.body.appendChild(d);try{logo3d()}catch(e){}
-document.getElementById("ctpGo").onclick=async function(){msg("...");try{wipe();clearG();var r=await SB.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname,queryParams:{prompt:"select_account"}}});if(r.error)msg(r.error.message||"Google login fail")}catch(e){msg(String(e&&e.message||e))}};
+document.getElementById("ctpGo").onclick=async function(){msg("...");try{wipe();clearG();var r=await SB.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.href.split("#")[0],queryParams:{prompt:"select_account"}}});if(r.error)msg(r.error.message||"Google login fail")}catch(e){msg(String(e&&e.message||e))}};
 document.getElementById("ctpG").onclick=async function(){msg("...");wipe();clearG();var r;try{r=await T(SB.auth.signInAnonymously(),10000)}catch(e){return msg("Connection problem: "+e.message)}if(r.error)return msg(r.error.message);loadAndStart(r.data.session)}}
 
 function logo3d(){
@@ -109,11 +133,52 @@ R.render(sc,cam)}
 loop();
 }
 window.ctpLogout=async function(){showLoad("Logging out...");try{await Promise.race([save(),new Promise(function(r){setTimeout(r,1000)})])}catch(e){}clearG();sessionStorage.removeItem("ctp_ready");wipe();setTimeout(function(){location.replace("./")},50)};
-document.addEventListener("DOMContentLoaded",async function(){var s=null,err=false,stored=false;try{stored=Object.keys(localStorage).some(function(k){return k.indexOf("sb-")===0})}catch(e){}
-if(stored){try{s=(await T(SB.auth.getSession(),3500)).data.session}catch(e){err=true}}
-if(ready&&((s&&s.user.id===ready)||err)){last=JSON.stringify(snap());setInterval(save,10000);
-addEventListener("pagehide",save);document.addEventListener("visibilitychange",save);hideLoad()}
-else{sessionStorage.removeItem("ctp_ready");location.replace("./")}
+document.addEventListener("DOMContentLoaded", async function(){
+  // Check if returning from Google OAuth (URL hash contains tokens)
+  var hasOAuthHash = location.hash && (location.hash.indexOf("access_token=") > -1 || location.hash.indexOf("refresh_token=") > -1);
+  if(hasOAuthHash){
+    showLoad("Authenticating with Google...");
+    try {
+      var sessRes = await T(SB.auth.getSession(), 15000);
+      if(sessRes && sessRes.data && sessRes.data.session){
+        await loadAndStart(sessRes.data.session);
+        return;
+      }
+    } catch(e) {
+      console.warn("OAuth session fetch error:", e);
+    }
+  }
+
+  // Check stored Supabase session
+  var session = null;
+  var hasStored = false;
+  try {
+    hasStored = Object.keys(localStorage).some(function(k){ return k.indexOf("sb-") === 0; });
+  } catch(e){}
+
+  if(hasStored || ready){
+    try {
+      var sRes = await T(SB.auth.getSession(), 8000);
+      session = sRes && sRes.data && sRes.data.session;
+    } catch(e){}
+  }
+
+  if(ready || session){
+    if(session && !ready) sessionStorage.setItem("ctp_ready", session.user.id);
+    last = JSON.stringify(snap());
+    setInterval(save, 10000);
+    addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", save);
+    hideLoad();
+    var h = document.getElementById("ctp_hide");
+    if(h) h.remove();
+    var el = document.getElementById("ctpLogin");
+    if(el) el.remove();
+  } else {
+    // Show login interface
+    hideLoad();
+    ui();
+  }
 });
 })();
 </script>
@@ -810,27 +875,101 @@ function getCrashLive(name, key, cycleSec){
 }
 
 
-/* ===== Admin Predict: next N results from period/seed ===== */
 function buildPreviewHTML(){
-  var colours=getColourLive();
-  var k3list=getK3All();
-  var d5list=get5DAll();
-  var html='<div style="margin-bottom:8px;font-size:12px;opacity:.65">⏱ Live lottery results • har second update</div>';
-  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🎨 Colour Trading (WinGo)</b>';
+  var colours = getColourLive();
+  var k3list = getK3All();
+  var d5list = get5DAll();
+
+  var html = '<div style="margin-bottom:12px;font-size:12px;opacity:.75">⏱ Live Lottery Results (WinGo, K3, 5D) • Automatic live update</div>';
+
+  // 1. COLOUR TRADING (WINGO)
+  html += '<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px">';
+  html += '<div style="font-weight:900;font-size:15px;margin-bottom:6px;display:flex;justify-content:space-between"><span>🎨 Colour Trading (WinGo)</span><span style="font-size:11px;opacity:.7">All Modes</span></div>';
   colours.forEach(function(r){
-    html+='<div style="background:#0a0f3d;border:1px solid #ffffff18;border-radius:12px;padding:12px;margin-top:8px">';
-    html+='<div style="display:flex;justify-content:space-between"><b>'+r.name+'</b><span style="font-size:12px">'+r.left+'s</span></div>';
-    html+='<div style="display:flex;gap:14px;align-items:center;margin-top:8px"><div style="width:44px;height:44px;border-radius:50%;background:#2f8cff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900">'+r.n+'</div><div><b style="color:'+(r.sz==="Big"?"#4be08a":"#ff6b6b")+'">'+r.sz+'</b><div style="font-size:12px">'+r.cols.join(' • ')+'</div></div></div></div>';
+    var colBadges = r.cols.map(function(c){
+      var bg = c==="Green"?"#17a85a":c==="Red"?"#e02f4a":"#8a4fd8";
+      return '<span style="background:'+bg+';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">'+c+'</span>';
+    }).join(' ');
+    var szCol = r.sz==="Big" ? "#2f8cff" : "#e0922f";
+    html += '<div style="background:#0a0f3d;border:1px solid #ffffff12;border-radius:10px;padding:10px;margin-top:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<b>'+r.name+'</b>';
+    html += '<span style="font-size:12px;color:'+_tickStyle(r.left)+';font-weight:700">⏱ '+r.left+'s</span>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">';
+    html += '<div style="display:flex;align-items:center;gap:10px">';
+    html += '<div style="width:40px;height:40px;border-radius:50%;background:#2f8cff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900">'+r.n+'</div>';
+    html += '<div>'+colBadges+'</div>';
+    html += '</div>';
+    html += '<div style="font-size:15px;font-weight:900;color:'+szCol+'">'+r.sz+'</div>';
+    html += '</div>';
+    html += '</div>';
   });
-  html+='</div>';
-  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🎲 K3 (All Modes)</b>';
-  k3list.forEach(function(k){html+='<div style="background:#0a0f3d;border-radius:10px;padding:10px;margin-top:8px"><div style="display:flex;justify-content:space-between"><b>'+k.name+'</b><span>'+k.left+'s</span></div><div style="text-align:center;font-size:22px;font-weight:900;margin-top:6px">'+k.d.join(' · ')+' <small style="font-size:12px;opacity:.75">Sum '+k.sum+' · '+(k.big?'Big':'Small')+' · '+(k.odd?'Odd':'Even')+'</small></div></div>';});
-  html+='</div>';
-  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🔢 5D (All Modes)</b>';
-  d5list.forEach(function(x){html+='<div style="background:#0a0f3d;border-radius:10px;padding:10px;margin-top:8px"><div style="display:flex;justify-content:space-between"><b>'+x.name+'</b><span>'+x.left+'s</span></div><div style="text-align:center;font-size:22px;font-weight:900;margin-top:6px;letter-spacing:4px">'+x.d.join('')+' <small style="font-size:12px;opacity:.75;letter-spacing:0">Sum '+x.sum+' · '+(x.big?'Big':'Small')+' · '+(x.odd?'Odd':'Even')+'</small></div></div>';});
-  html+='</div>';
+  html += '</div>';
+
+  // 2. K3
+  html += '<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px">';
+  html += '<div style="font-weight:900;font-size:15px;margin-bottom:6px;display:flex;justify-content:space-between"><span>🎲 K3 Lotteries</span><span style="font-size:11px;opacity:.7">All Modes</span></div>';
+  k3list.forEach(function(k){
+    html += '<div style="background:#0a0f3d;border:1px solid #ffffff12;border-radius:10px;padding:10px;margin-top:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<b>'+k.name+'</b>';
+    html += '<span style="font-size:12px;color:'+_tickStyle(k.left)+';font-weight:700">⏱ '+k.left+'s</span>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">';
+    html += '<div style="font-size:22px;font-weight:900;letter-spacing:4px">🎲 '+k.d.join(' ')+'</div>';
+    html += '<div style="text-align:right;font-size:12px">';
+    html += '<div>Sum: <b>'+k.sum+'</b></div>';
+    html += '<div style="color:'+(k.big?'#2f8cff':'#e0922f')+';font-weight:700">'+(k.big?'Big':'Small')+' • '+(k.odd?'Odd':'Even')+'</div>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // 3. 5D
+  html += '<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px">';
+  html += '<div style="font-weight:900;font-size:15px;margin-bottom:6px;display:flex;justify-content:space-between"><span>🔢 5D Lotteries</span><span style="font-size:11px;opacity:.7">All Modes</span></div>';
+  d5list.forEach(function(d){
+    html += '<div style="background:#0a0f3d;border:1px solid #ffffff12;border-radius:10px;padding:10px;margin-top:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<b>'+d.name+'</b>';
+    html += '<span style="font-size:12px;color:'+_tickStyle(d.left)+';font-weight:700">⏱ '+d.left+'s</span>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">';
+    html += '<div style="font-size:20px;font-weight:900;letter-spacing:6px;color:#4be08a">'+d.d.join('')+'</div>';
+    html += '<div style="text-align:right;font-size:12px">';
+    html += '<div>Sum: <b>'+d.sum+'</b></div>';
+    html += '<div style="color:'+(d.big?'#2f8cff':'#e0922f')+';font-weight:700">'+(d.big?'Big':'Small')+' • '+(d.odd?'Odd':'Even')+'</div>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  html += '<button onclick="showAdminUI()" style="width:100%;margin-top:6px;background:#2f8cff;border:none;color:#fff;padding:12px;border-radius:10px;font-weight:700;cursor:pointer">🔄 Refresh Now</button>';
   return html;
 }
+
+window.openAdmin = function(){
+  ensureAdmin();
+  const pass = prompt("Admin Password:");
+  if(pass !== ADMIN_PASS){ toast("Galat password"); return; }
+  window._adminOpen = true; _adminOpen = true;
+  window._adminTab = "dash"; _adminTab = "dash";
+  showAdminUI();
+};
+
+window.closeAdmin = function(){
+  window._adminOpen = false; _adminOpen = false;
+  const el = document.getElementById("adminPanel");
+  if(el) el.remove();
+};
+
+window.adminTab = function(t){
+  window._adminTab = t; _adminTab = t;
+  showAdminUI();
+};
 
 function adminStat(){
   const dep = (S.depHist||[]).reduce((a,x)=>a+(x.amt||0),0);
@@ -851,7 +990,7 @@ function showAdminUI(){
 
   const tabs = [
     ["dash","📊 Dashboard"],
-    ["preview","🎯 Lottery Live"],
+    ["preview","🔮 Live Preview"],
     ["users","👤 Users"],
     ["dep","⬇️ Deposits"],
     ["wd","⬆️ Withdrawals"],
@@ -865,6 +1004,7 @@ function showAdminUI(){
   if(_adminTab==="preview"){
     body = buildPreviewHTML();
   }
+
   else if(_adminTab==="dash"){
     body = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
