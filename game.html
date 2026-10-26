@@ -712,7 +712,8 @@ function ensureAdmin(){
 
 
 
-/* ===== LIVE PREVIEW (accurate + hard countdown) ===== */
+
+/* ===== LIVE PREVIEW (full modes) ===== */
 window._preview = window._preview || {};
 
 function _colOf(n){
@@ -721,49 +722,54 @@ function _colOf(n){
   if([1,3,7,9].indexOf(n)>=0) return ["Green"];
   return ["Red"];
 }
-
 function _tickStyle(left){
-  // hard countdown style when <=5
-  if(left <= 5) return "color:#ff3b5c;font-weight:900;font-size:18px";
-  if(left <= 15) return "color:#ff8a2a;font-weight:800";
-  return "color:#9aa3d8";
+  if(left<=5) return "color:#ff3b5c;font-weight:900;font-size:16px";
+  if(left<=15) return "color:#ff8a2a;font-weight:800";
+  return "color:#9aa3d8;font-size:13px";
 }
+function _dice(seed,k){ return ((seed*k*17)%6)+1; }
+function _dig(seed,i){ return (seed*(i+2)*13 + i*7)%10; }
 
 function getColourLive(){
   var modes=[{m:30,name:"30 Sec"},{m:60,name:"1 Min"},{m:180,name:"3 Min"},{m:300,name:"5 Min"}];
   var now=Math.floor(Date.now()/1000), list=[];
   modes.forEach(function(o){
-    var cur=Math.floor(now/o.m), next=cur+1, left=o.m-(now%o.m), n;
+    var next=Math.floor(now/o.m)+1, left=o.m-(now%o.m), n;
     try{
       if(S.admin && S.admin.forceColour!==null && S.admin.forceColour!==undefined) n=S.admin.forceColour;
       else if(typeof resN==="function") n=resN(o.m, next);
       else n=Math.floor(Math.random()*10);
     }catch(e){n=0;}
-    list.push({m:o.m,name:o.name,n:n,sz:n>=5?"Big":"Small",cols:_colOf(n),left:left,period:next,urgent:left<=60});
+    list.push({name:o.name,n:n,sz:n>=5?"Big":"Small",cols:_colOf(n),left:left,period:next});
   });
   return list;
 }
 
-function getK3Live(){
-  var t=Math.floor(Date.now()/1000);
-  var cycle=30; // 30s round
-  var left=cycle-(t%cycle);
-  var seed=Math.floor(t/cycle);
-  function d(s,k){return ((s*k*17)%6)+1;}
-  var d1=d(seed,3), d2=d(seed,7), d3=d(seed,11);
-  var sum=d1+d2+d3;
-  return {d:[d1,d2,d3], sum:sum, big:sum>=11, odd:sum%2===1, left:left};
+function getK3All(){
+  var modes=[{m:60,name:"1 Min"},{m:180,name:"3 Min"},{m:300,name:"5 Min"},{m:600,name:"10 Min"}];
+  var now=Math.floor(Date.now()/1000), list=[];
+  modes.forEach(function(o){
+    var left=o.m-(now%o.m);
+    var seed=Math.floor(now/o.m)+1;
+    var d1=_dice(seed,3), d2=_dice(seed,7), d3=_dice(seed,11);
+    var sum=d1+d2+d3;
+    list.push({name:o.name,d:[d1,d2,d3],sum:sum,big:sum>=11,odd:sum%2===1,left:left});
+  });
+  return list;
 }
 
-function get5DLive(){
-  var t=Math.floor(Date.now()/1000);
-  var cycle=30;
-  var left=cycle-(t%cycle);
-  var seed=Math.floor(t/cycle);
-  var digs=[];
-  for(var i=0;i<5;i++) digs.push((seed*(i+2)*13 + i*7)%10);
-  var sum=digs.reduce(function(a,b){return a+b;},0);
-  return {d:digs, sum:sum, big:sum>=23, odd:sum%2===1, left:left};
+function get5DAll(){
+  var modes=[{m:60,name:"1 Min"},{m:180,name:"3 Min"},{m:300,name:"5 Min"},{m:600,name:"10 Min"}];
+  var now=Math.floor(Date.now()/1000), list=[];
+  modes.forEach(function(o){
+    var left=o.m-(now%o.m);
+    var seed=Math.floor(now/o.m)+1;
+    var digs=[];
+    for(var i=0;i<5;i++) digs.push(_dig(seed,i));
+    var sum=digs.reduce(function(a,b){return a+b;},0);
+    list.push({name:o.name,d:digs,sum:sum,big:sum>=23,odd:sum%2===1,left:left});
+  });
+  return list;
 }
 
 function getCrashLive(name, key, cycleSec){
@@ -789,72 +795,76 @@ function getCrashLive(name, key, cycleSec){
 
 function buildPreviewHTML(){
   var colours=getColourLive();
-  var k3=getK3Live();
-  var d5=get5DLive();
+  var k3list=getK3All();
+  var d5list=get5DAll();
   var avs=[
     getCrashLive("Aviator",1,15),
     getCrashLive("Axiator",2,15),
-    getCrashLive("Cricket",3,15)
+    getCrashLive("Cricket Crash",3,15)
   ];
 
-  var html='<div style="margin-bottom:8px;font-size:12px;opacity:.65">⏱ Live hard countdown • har second update</div>';
+  var html='<div style="margin-bottom:8px;font-size:12px;opacity:.65">⏱ Live hard countdown • har second</div>';
 
   // COLOUR
   html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🎨 Colour Trading</b>';
   colours.forEach(function(r){
-    var border=r.left<=5?"#ff3b5c":(r.urgent?"#ff8a2a":"#ffffff15");
-    var bg=r.left<=5?"#2a0a12":(r.urgent?"#2a1808":"#0a0f3d");
-    html+='<div style="background:'+bg+';border:1.5px solid '+border+';border-radius:12px;padding:12px;margin-top:8px">';
-    html+='<div style="display:flex;justify-content:space-between;align-items:center"><b>'+r.name+'</b>';
-    html+='<span style="'+_tickStyle(r.left)+'">'+r.left+'s</span></div>';
+    var low=r.left<=5, urg=r.left<=60;
+    html+='<div style="background:'+(low?"#2a0a12":urg?"#2a1808":"#0a0f3d")+';border:1.5px solid '+(low?"#ff3b5c":urg?"#ff8a2a":"#ffffff15")+';border-radius:12px;padding:12px;margin-top:8px">';
+    html+='<div style="display:flex;justify-content:space-between"><b>'+r.name+'</b><span style="'+_tickStyle(r.left)+'">'+r.left+'s</span></div>';
     html+='<div style="display:flex;gap:14px;align-items:center;margin-top:8px">';
-    html+='<div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(145deg,#2f8cff,#1a4a9a);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900">'+r.n+'</div>';
-    html+='<div><div style="font-size:17px;font-weight:800;color:'+(r.sz==="Big"?"#4be08a":"#ff6b6b")+'">'+r.sz+'</div>';
-    html+='<div style="margin-top:3px">'+r.cols.map(function(c){return '<span style="margin-right:5px;padding:2px 8px;border-radius:6px;font-size:12px;background:'+(c.indexOf("Red")>=0?"#d83a3a55":c.indexOf("Green")>=0?"#17a85a55":"#8a4fd855")+'">'+c+'</span>';}).join("")+'</div></div></div>';
-    html+='<div style="font-size:11px;opacity:.45;margin-top:4px">Period '+r.period+'</div></div>';
+    html+='<div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(145deg,#2f8cff,#1a4a9a);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900">'+r.n+'</div>';
+    html+='<div><div style="font-size:16px;font-weight:800;color:'+(r.sz==="Big"?"#4be08a":"#ff6b6b")+'">'+r.sz+'</div>';
+    html+='<div style="margin-top:3px">'+r.cols.map(function(c){return '<span style="margin-right:4px;padding:2px 7px;border-radius:6px;font-size:11px;background:'+(c.indexOf("Red")>=0?"#d83a3a55":c.indexOf("Green")>=0?"#17a85a55":"#8a4fd855")+'">'+c+'</span>';}).join("")+'</div></div></div></div>';
   });
   html+='</div>';
 
-  // K3 with hard countdown
-  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px">';
-  html+='<div style="display:flex;justify-content:space-between;align-items:center"><b>🎲 K3</b><span style="'+_tickStyle(k3.left)+'">'+k3.left+'s</span></div>';
-  if(k3.left<=5){
-    html+='<div style="text-align:center;font-size:42px;font-weight:900;color:#ff3b5c;margin:8px 0;letter-spacing:8px">'+k3.left+'</div>';
-  }
-  html+='<div style="display:flex;justify-content:center;gap:10px;margin:12px 0">';
-  k3.d.forEach(function(d){ html+='<div style="width:46px;height:46px;border-radius:12px;background:#0a0f3d;border:2px solid #5a6bff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900">'+d+'</div>'; });
+  // K3 ALL MODES
+  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🎲 K3 (All Modes)</b>';
+  k3list.forEach(function(k){
+    var low=k.left<=5;
+    html+='<div style="background:'+(low?"#2a0a12":"#0a0f3d")+';border:1px solid '+(low?"#ff3b5c":"#ffffff12")+';border-radius:12px;padding:10px;margin-top:8px">';
+    html+='<div style="display:flex;justify-content:space-between;margin-bottom:6px"><b style="font-size:13px">'+k.name+'</b><span style="'+_tickStyle(k.left)+'">'+k.left+'s</span></div>';
+    if(low) html+='<div style="text-align:center;font-size:32px;font-weight:900;color:#ff3b5c;margin:4px 0">'+k.left+'</div>';
+    html+='<div style="display:flex;justify-content:center;gap:8px;margin:6px 0">';
+    k.d.forEach(function(d){ html+='<div style="width:40px;height:40px;border-radius:10px;background:#12163d;border:2px solid #5a6bff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900">'+d+'</div>'; });
+    html+='</div>';
+    html+='<div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;font-size:12px;margin-top:4px">';
+    html+='<span style="padding:3px 8px;border-radius:6px;background:#ffffff12">Sum '+k.sum+'</span>';
+    html+='<span style="padding:3px 8px;border-radius:6px;background:'+(k.big?"#17a85a55":"#ffffff10")+'">'+(k.big?"Big":"Small")+'</span>';
+    html+='<span style="padding:3px 8px;border-radius:6px;background:'+(k.odd?"#2f8cff55":"#ffffff10")+'">'+(k.odd?"Odd":"Even")+'</span>';
+    html+='</div></div>';
+  });
   html+='</div>';
-  html+='<div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;font-size:13px">';
-  html+='<span style="padding:4px 10px;border-radius:8px;background:#ffffff12">Sum <b>'+k3.sum+'</b></span>';
-  html+='<span style="padding:4px 10px;border-radius:8px;background:'+(k3.big?"#17a85a55":"#ffffff10")+'">'+(k3.big?"Big":"Small")+'</span>';
-  html+='<span style="padding:4px 10px;border-radius:8px;background:'+(k3.odd?"#2f8cff55":"#ffffff10")+'">'+(k3.odd?"Odd":"Even")+'</span>';
-  html+='</div></div>';
 
-  // 5D with hard countdown
-  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px">';
-  html+='<div style="display:flex;justify-content:space-between;align-items:center"><b>🔢 5D</b><span style="'+_tickStyle(d5.left)+'">'+d5.left+'s</span></div>';
-  if(d5.left<=5){
-    html+='<div style="text-align:center;font-size:42px;font-weight:900;color:#ff3b5c;margin:8px 0;letter-spacing:8px">'+d5.left+'</div>';
-  }
-  html+='<div style="display:flex;justify-content:center;gap:7px;margin:12px 0">';
-  d5.d.forEach(function(d){ html+='<div style="width:38px;height:38px;border-radius:10px;background:#0a0f3d;border:2px solid #8a4fd8;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900">'+d+'</div>'; });
+  // 5D ALL MODES
+  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🔢 5D (All Modes)</b>';
+  d5list.forEach(function(x){
+    var low=x.left<=5;
+    html+='<div style="background:'+(low?"#2a0a12":"#0a0f3d")+';border:1px solid '+(low?"#ff3b5c":"#ffffff12")+';border-radius:12px;padding:10px;margin-top:8px">';
+    html+='<div style="display:flex;justify-content:space-between;margin-bottom:6px"><b style="font-size:13px">'+x.name+'</b><span style="'+_tickStyle(x.left)+'">'+x.left+'s</span></div>';
+    if(low) html+='<div style="text-align:center;font-size:32px;font-weight:900;color:#ff3b5c;margin:4px 0">'+x.left+'</div>';
+    html+='<div style="display:flex;justify-content:center;gap:6px;margin:6px 0">';
+    x.d.forEach(function(d){ html+='<div style="width:34px;height:34px;border-radius:8px;background:#12163d;border:2px solid #8a4fd8;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900">'+d+'</div>'; });
+    html+='</div>';
+    html+='<div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;font-size:12px;margin-top:4px">';
+    html+='<span style="padding:3px 8px;border-radius:6px;background:#ffffff12">Sum '+x.sum+'</span>';
+    html+='<span style="padding:3px 8px;border-radius:6px;background:'+(x.big?"#17a85a55":"#ffffff10")+'">'+(x.big?"Big":"Small")+'</span>';
+    html+='<span style="padding:3px 8px;border-radius:6px;background:'+(x.odd?"#2f8cff55":"#ffffff10")+'">'+(x.odd?"Odd":"Even")+'</span>';
+    html+='</div></div>';
+  });
   html+='</div>';
-  html+='<div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;font-size:13px">';
-  html+='<span style="padding:4px 10px;border-radius:8px;background:#ffffff12">Sum <b>'+d5.sum+'</b></span>';
-  html+='<span style="padding:4px 10px;border-radius:8px;background:'+(d5.big?"#17a85a55":"#ffffff10")+'">'+(d5.big?"Big":"Small")+'</span>';
-  html+='<span style="padding:4px 10px;border-radius:8px;background:'+(d5.odd?"#2f8cff55":"#ffffff10")+'">'+(d5.odd?"Odd":"Even")+'</span>';
-  html+='</div></div>';
 
-  // THREE AVIATORS with hard countdown
-  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b>✈️ Crash Games</b>';
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">';
+  // CRASH GAMES - clear labels
+  html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">✈️ Crash Games</b>';
+  html+='<div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px">';
   avs.forEach(function(a){
-    var low = a.left<=5;
-    html+='<div style="background:'+(low?"#2a0a12":"#0a0f3d")+';border-radius:12px;padding:12px 8px;text-align:center;border:1.5px solid '+(low?"#ff3b5c":"#ffffff12")+'">';
-    html+='<div style="font-size:11px;opacity:.7;margin-bottom:2px">'+a.name+'</div>';
-    html+='<div style="font-size:22px;font-weight:900;color:#ffd23f">'+a.crash+'x</div>';
-    html+='<div style="margin-top:6px;'+_tickStyle(a.left)+'">'+a.left+'s</div>';
-    if(a.forced) html+='<div style="font-size:10px;color:#ff8a2a">Forced</div>';
+    var low=a.left<=5;
+    html+='<div style="background:'+(low?"#2a0a12":"#0a0f3d")+';border-radius:12px;padding:12px;border:1.5px solid '+(low?"#ff3b5c":"#ffffff12")+';display:flex;align-items:center;justify-content:space-between">';
+    html+='<div><div style="font-size:14px;font-weight:800">'+a.name+'</div>';
+    if(a.forced) html+='<div style="font-size:10px;color:#ff8a2a">⚡ Forced</div>';
+    html+='</div>';
+    html+='<div style="text-align:right"><div style="font-size:26px;font-weight:900;color:#ffd23f">'+a.crash+'x</div>';
+    html+='<div style="'+_tickStyle(a.left)+'">'+a.left+'s left</div></div>';
     html+='</div>';
   });
   html+='</div></div>';
@@ -867,19 +877,19 @@ window.openAdmin = function(){
   ensureAdmin();
   const pass = prompt("Admin Password:");
   if(pass !== ADMIN_PASS){ toast("Galat password"); return; }
-  _adminOpen = true;
-  _adminTab = "dash";
+  window._adminOpen = true; _adminOpen = true;
+  window._adminTab = "dash"; _adminTab = "dash";
   showAdminUI();
 };
 
 window.closeAdmin = function(){
-  _adminOpen = false;
+  window._adminOpen = false; _adminOpen = false;
   const el = document.getElementById("adminPanel");
   if(el) el.remove();
 };
 
 window.adminTab = function(t){
-  _adminTab = t;
+  window._adminTab = t; _adminTab = t;
   showAdminUI();
 };
 
@@ -4474,11 +4484,20 @@ window.Ludo={open:start,close,config:CFG,_t:{legal:(s,r)=>G&&legal(s,r),victims:
 })();
 </script>
 <script>
-// Live countdown every 1 second (Colour Trading style)
-setInterval(function(){
-  if(_adminOpen && _adminTab === "preview"){
-    try{ showAdminUI(); }catch(e){}
-  }
-}, 1000);
+
 </script>
+
+<script>
+/* Strong live timer - every 1 second */
+(function(){
+  setInterval(function(){
+    try{
+      if(window._adminOpen && window._adminTab === "preview" && typeof showAdminUI === "function"){
+        showAdminUI();
+      }
+    }catch(e){}
+  }, 1000);
+})();
+</script>
+
 </body></html>
