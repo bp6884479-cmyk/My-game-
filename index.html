@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1a1fa8">
 <title>Colour Trading Pro</title>
-<script>(function(){try{var st=Object.keys(localStorage).some(function(k){return k.indexOf("sb-")===0}),au=/access_token=|[?&]code=/.test(location.hash+location.search);if(st||au){document.documentElement.className="chk";fetch("game.html").catch(function(){});fetch("three.min.js").catch(function(){})}}catch(e){}})()</script>
+<script>(function(){try{var st=Object.keys(localStorage).some(function(k){return k.indexOf("sb-")===0}),au=/access_token=|[?&]code=/.test(location.hash+location.search);if(st||au){document.documentElement.className="chk"}}catch(e){}})()</script>
 <style>html,body{margin:0;height:100%;background:#0a0f3d}
 #ctpLoad{display:none;position:fixed;inset:0;z-index:100000;background:#0a0f3d;flex-direction:column;align-items:center;justify-content:center;color:#ffd23f;font:700 16px system-ui,sans-serif;gap:16px}
 #ctpLoad i{width:48px;height:48px;border:5px solid #ffd23f33;border-top-color:#ffd23f;border-radius:50%;animation:ctpS .8s linear infinite}
@@ -124,14 +124,17 @@ var stored=false;try{stored=Object.keys(localStorage).some(function(k){return k.
 var hasAuth=/access_token=|[?&]code=/.test(location.hash+location.search);
 var em=(location.hash+"&"+location.search).match(/error_description=([^&]+)/);
 if(!stored&&!hasAuth){hideLoad();setTimeout(startLogo,30);setTimeout(prefetch,2000);return}
-setTimeout(function(){if(document.documentElement.className==="chk"){hideLoad();msg("Server slow hai, dobara try karo");setTimeout(startLogo,30)}},12000);
+setTimeout(function(){if(document.documentElement.className==="chk"){hideLoad();msg("Server slow hai, dobara try karo");setTimeout(startLogo,30)}},hasAuth?26000:12000);
+var authP=null;
+if(hasAuth){authP=new Promise(function(res){var done=false;try{SB.auth.onAuthStateChange(function(ev,ss){if(ss&&!done){done=true;res(ss)}})}catch(e){}setTimeout(function(){if(!done){done=true;res(null)}},20000)})}
 var s=null,err=false;
-try{s=(await T(SB.auth.getSession(),3500)).data.session}catch(e){err=true}
-if(!s&&hasAuth){s=await new Promise(function(res){var done=false;try{SB.auth.onAuthStateChange(function(ev,ss){if(ss&&!done){done=true;res(ss)}})}catch(e){}setTimeout(function(){if(!done){done=true;res(null)}},9000)})}
+try{s=(await T(SB.auth.getSession(),hasAuth?12000:3500)).data.session}catch(e){err=true}
+if(!s&&hasAuth){s=await authP}
 if(s){if(ready&&s.user.id===ready)go();else loadAndStart(s);return}
 if(err&&ready){go();return}
 try{sessionStorage.removeItem("ctp_ready")}catch(e){}
 hideLoad();setTimeout(startLogo,30);setTimeout(prefetch,2000);
+if(hasAuth){try{history.replaceState(null,"",location.pathname)}catch(e){}}
 if(em)msg(decodeURIComponent(em[1].replace(/\+/g," ")));else if(hasAuth)msg("Google login complete nahi hua, dobara try karo")
 }catch(e){hideLoad();msg(String(e&&e.message||e))}
 }
