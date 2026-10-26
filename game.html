@@ -809,6 +809,443 @@ function getCrashLive(name, key, cycleSec){
   }
 }
 
+
+/* ===== Admin Predict: next N results from period/seed ===== */
+function _pidFromPeriod(p, modeSec){
+  var d = new Date(p * modeSec * 1000);
+  var map = {30:'1',60:'2',180:'3',300:'4',600:'5'};
+  return d.getUTCFullYear()
+    + String(d.getUTCMonth()+1).padStart(2,'0')
+    + String(d.getUTCDate()).padStart(2,'0')
+    + (map[modeSec]||'9')
+    + String(p % 100000).padStart(6,'0');
+}
+function predictColour(modeSec, startPeriod, count){
+  count = count || 10;
+  var out = [];
+  for(var i=0;i<count;i++){
+    var p = startPeriod + i;
+    var n = _previewColourHash(modeSec, p);
+    out.push({
+      i:i+1,
+      period:p,
+      code:_pidFromPeriod(p, modeSec),
+      n:n,
+      sz:n>=5?'Big':'Small',
+      odd:n%2===1?'Odd':'Even',
+      cols:_colOf(n)
+    });
+  }
+  return out;
+}
+function predictK3(modeSec, startSeed, count){
+  count = count || 10;
+  var out = [];
+  for(var i=0;i<count;i++){
+    var seed = startSeed + i;
+    var d1=_dice(seed,3), d2=_dice(seed,7), d3=_dice(seed,11);
+    var sum=d1+d2+d3;
+    out.push({i:i+1, seed:seed, d:[d1,d2,d3], sum:sum, big:sum>=11?'Big':'Small', odd:sum%2===1?'Odd':'Even'});
+  }
+  return out;
+}
+function predict5D(modeSec, startSeed, count){
+  count = count || 10;
+  var out = [];
+  for(var i=0;i<count;i++){
+    var seed = startSeed + i;
+    var digs=[];
+    for(var j=0;j<5;j++) digs.push(_dig(seed,j));
+    var sum=digs.reduce(function(a,b){return a+b;},0);
+    out.push({i:i+1, seed:seed, d:digs, sum:sum, big:sum>=23?'Big':'Small', odd:sum%2===1?'Odd':'Even'});
+  }
+  return out;
+}
+function predictCrash(key, cycleSec, startSlot, count){
+  count = count || 10;
+  cycleSec = cycleSec || 15;
+  var mn=1.2, mx=8;
+  try{
+    if(typeof S!=='undefined' && S.admin){
+      mn = S.admin.avMin || 1.2;
+      mx = S.admin.avMax || 8;
+    }
+  }catch(e){}
+  var salt = key===1?17:key===2?31:53;
+  var out = [];
+  for(var i=0;i<count;i++){
+    var slot = startSlot + i;
+    var r=((slot*9301*salt + 49297)%233280)/233280;
+    var crash=+(mn+(mx-mn)*Math.pow(r,1.65)).toFixed(2);
+    out.push({i:i+1, slot:slot, crash:crash});
+  }
+  return out;
+}
+
+function buildPredictHTML(){
+  var html = '';
+  html += '<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px">';
+  html += '<b style="font-size:16px">🎯 Game Number Predictor — Sab Games</b>';
+  html += '<div style="font-size:12px;opacity:.7;margin:6px 0 12px">Period / seed / slot number daalo → aane wale 10 results. Ya <b>All Games Snapshot</b> se har game ka next result ek saath.</div>';
+
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px">';
+  html += '<button onclick="predAllSnapshot()" style="flex:1;background:linear-gradient(135deg,#17a85a,#0a6a3a);border:0;color:#fff;padding:12px;border-radius:10px;font-weight:800">📋 All Games Snapshot</button>';
+  html += '</div>';
+
+  html += '<label style="font-size:13px;opacity:.85">Game Type</label>';
+  html += '<select id="predGame" onchange="predOnGameChange()" style="width:100%;margin:6px 0 10px;padding:11px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:14px">';
+  html += '<option value="colour">🎨 Colour Trading (WinGo)</option>';
+  html += '<option value="k3">🎲 K3 / 3 Dice</option>';
+  html += '<option value="5d">5️⃣ 5D</option>';
+  html += '<option value="roulette">🎰 Roulette</option>';
+  html += '<option value="mines">💣 Bomb Pro (Mines)</option>';
+  html += '<option value="aviator">✈️ Aviator</option>';
+  html += '<option value="axiator">🚀 Axiator</option>';
+  html += '<option value="cricket">🏏 Cricket Crash</option>';
+  html += '<option value="chicken">🐔 Chicken Road (Murga)</option>';
+  html += '<option value="ludo">🎲 Ludo Rush</option>';
+  html += '</select>';
+
+  html += '<div id="predModeWrap">';
+  html += '<label style="font-size:13px;opacity:.85">Mode / Interval</label>';
+  html += '<select id="predMode" style="width:100%;margin:6px 0 10px;padding:11px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:14px">';
+  html += '<option value="30">30 Sec</option>';
+  html += '<option value="60" selected>1 Min</option>';
+  html += '<option value="180">3 Min</option>';
+  html += '<option value="300">5 Min</option>';
+  html += '</select></div>';
+
+  html += '<label style="font-size:13px;opacity:.85" id="predNumLabel">Period / Seed Number</label>';
+  html += '<input id="predNum" type="text" inputmode="numeric" placeholder="e.g. current period number" style="width:100%;margin:6px 0 10px;padding:12px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:15px;font-weight:700"/>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:8px">';
+  html += '<button onclick="predFillCurrent()" style="flex:1;background:#ffffff18;border:0;color:#9fc1ff;padding:11px;border-radius:10px;font-weight:700">⏱ Current</button>';
+  html += '<button onclick="runPredict()" style="flex:1.4;background:linear-gradient(135deg,#2f8cff,#8a4fd8);border:0;color:#fff;padding:11px;border-radius:10px;font-weight:800">🔍 Predict Next 10</button>';
+  html += '</div>';
+  html += '<div style="font-size:11px;opacity:.6;margin-bottom:4px">Colour auto-rig on hone par final result bets pe depend karta hai — yahan base hash dikhta hai. Chicken/Ludo pure live RNG hain.</div>';
+  html += '</div>';
+  html += '<div id="predOut"></div>';
+  return html;
+}
+function predOnGameChange(){
+  var g = document.getElementById('predGame');
+  var mw = document.getElementById('predModeWrap');
+  var lab = document.getElementById('predNumLabel');
+  if(!g||!mw) return;
+  var v = g.value;
+  if(v==='colour'){
+    mw.style.display='block';
+    mw.querySelector('#predMode').innerHTML = '<option value="30">30 Sec</option><option value="60" selected>1 Min</option><option value="180">3 Min</option><option value="300">5 Min</option>';
+    if(lab) lab.textContent = 'Period Index (floor(now/mode) — Current button use karo)';
+  } else if(v==='k3'||v==='5d'){
+    mw.style.display='block';
+    mw.querySelector('#predMode').innerHTML = '<option value="60" selected>1 Min</option><option value="180">3 Min</option><option value="300">5 Min</option><option value="600">10 Min</option>';
+    if(lab) lab.textContent = 'Seed Index (floor(now/mode)+1)';
+  } else if(v==='roulette'){
+    mw.style.display='none';
+    if(lab) lab.textContent = 'Roulette Period (floor(now/30000))';
+  } else if(v==='mines'){
+    mw.style.display='none';
+    if(lab) lab.textContent = 'Round Index (Current = live round)';
+  } else if(v==='chicken'||v==='ludo'){
+    mw.style.display='none';
+    if(lab) lab.textContent = 'Is game me fixed period nahi — Current dabao for info';
+  } else {
+    mw.style.display='none';
+    if(lab) lab.textContent = 'Crash Slot (floor(now/15))';
+  }
+}
+function predParsePeriod(raw, modeSec){
+  raw = String(raw||'').trim();
+  if(!raw) return null;
+  if(/^\d{12,}$/.test(raw)){
+    return parseInt(raw.slice(-6),10);
+  }
+  var n = parseInt(raw,10);
+  return isFinite(n) ? n : null;
+}
+function predFillCurrent(){
+  var g = (document.getElementById('predGame')||{}).value || 'colour';
+  var modeEl = document.getElementById('predMode');
+  var modeSec = modeEl ? +modeEl.value : 60;
+  var now = Math.floor(Date.now()/1000);
+  var num = document.getElementById('predNum');
+  if(!num) return;
+  if(g==='colour'){
+    num.value = Math.floor(now/modeSec);
+  } else if(g==='k3'||g==='5d'){
+    num.value = Math.floor(now/modeSec)+1;
+  } else if(g==='roulette'){
+    num.value = Math.floor(Date.now()/30000);
+  } else if(g==='mines'){
+    try{
+      if(window.MinesPro && window.MinesPro.getLive){
+        var lv = window.MinesPro.getLive();
+        num.value = (lv && lv.cur && lv.cur.id) ? lv.cur.id : 0;
+      } else num.value = 0;
+    }catch(e){ num.value = 0; }
+  } else if(g==='chicken'||g==='ludo'){
+    num.value = 'RNG';
+  } else {
+    num.value = Math.floor(now/15);
+  }
+  runPredict();
+}
+window.predOnGameChange = predOnGameChange;
+window.predFillCurrent = predFillCurrent;
+
+function _rouletteHash(p){
+  try{
+    if(typeof S!=='undefined'&&S.admin&&S.admin.forceRoulette!==null&&S.admin.forceRoulette!==undefined&&S.admin.forceRoulette!==''){
+      var fr=parseInt(S.admin.forceRoulette);
+      if(fr>=0&&fr<=36) return fr;
+    }
+  }catch(e){}
+  var h=2166136261^37;
+  var k='ROULETTE|'+p;
+  for(var i=0;i<k.length;i++){h^=k.charCodeAt(i);h=Math.imul(h,16777619);}
+  h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;
+  h=Math.imul(h,0xc2b2ae35);h^=h>>>16;
+  return (h>>>0)%37;
+}
+function predictRoulette(startP, count){
+  count = count || 10;
+  var REDS=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+  var out=[];
+  for(var i=0;i<count;i++){
+    var p=startP+i;
+    var n=_rouletteHash(p);
+    var color=n===0?'Green':(REDS.has(n)?'Red':'Black');
+    var odd=n===0?'Zero':(n%2?'Odd':'Even');
+    var range=n===0?'—':(n<=18?'Low 1–18':'High 19–36');
+    var d=new Date(p*30000);
+    var code=d.getUTCFullYear()+String(d.getUTCMonth()+1).padStart(2,'0')+String(d.getUTCDate()).padStart(2,'0')+'R'+String(p%100000).padStart(6,'0');
+    out.push({i:i+1,period:p,code:code,n:n,color:color,odd:odd,range:range});
+  }
+  return out;
+}
+
+window.predAllSnapshot = function(){
+  var box = document.getElementById('predOut');
+  if(!box) return;
+  var now = Math.floor(Date.now()/1000);
+  var html = '<div style="background:#12163d;border-radius:14px;padding:14px"><b style="font-size:15px">📋 All Games — Next Result Snapshot</b><div style="font-size:11px;opacity:.65;margin:4px 0 12px">Har game ka current/next result (deterministic games)</div>';
+
+  html += '<div style="margin-bottom:14px"><div style="font-weight:800;color:#ffd23f;margin-bottom:6px">🎨 Colour Trading</div>';
+  [30,60,180,300].forEach(function(m){
+    var p=Math.floor(now/m);
+    var n=_previewColourHash(m,p);
+    var left=m-(now%m);
+    var name={30:'30s',60:'1m',180:'3m',300:'5m'}[m];
+    var cols=_colOf(n).join('+');
+    html += '<div style="display:flex;justify-content:space-between;padding:8px 10px;background:#0a0f3d;border-radius:8px;margin-bottom:4px;font-size:13px">';
+    html += '<span>'+name+' · p='+p+' · <b style="color:#9fc1ff">'+left+'s</b></span>';
+    html += '<span><b style="font-size:16px">'+(n)+'</b> · '+(n>=5?'Big':'Small')+' · '+cols+'</span></div>';
+  });
+  html += '</div>';
+
+  html += '<div style="margin-bottom:14px"><div style="font-weight:800;color:#ffd23f;margin-bottom:6px">🎲 K3</div>';
+  [60,180,300,600].forEach(function(m){
+    var seed=Math.floor(now/m)+1;
+    var d1=_dice(seed,3),d2=_dice(seed,7),d3=_dice(seed,11);
+    var sum=d1+d2+d3;
+    var left=m-(now%m);
+    var name={60:'1m',180:'3m',300:'5m',600:'10m'}[m];
+    html += '<div style="display:flex;justify-content:space-between;padding:8px 10px;background:#0a0f3d;border-radius:8px;margin-bottom:4px;font-size:13px">';
+    html += '<span>'+name+' · seed '+seed+' · <b style="color:#9fc1ff">'+left+'s</b></span>';
+    html += '<span>'+d1+'+'+d2+'+'+d3+'=<b>'+sum+'</b> · '+(sum>=11?'Big':'Small')+' · '+(sum%2?'Odd':'Even')+'</span></div>';
+  });
+  html += '</div>';
+
+  html += '<div style="margin-bottom:14px"><div style="font-weight:800;color:#ffd23f;margin-bottom:6px">5️⃣ 5D</div>';
+  [60,180,300,600].forEach(function(m){
+    var seed=Math.floor(now/m)+1;
+    var digs=[]; for(var i=0;i<5;i++) digs.push(_dig(seed,i));
+    var sum=digs.reduce(function(a,b){return a+b;},0);
+    var left=m-(now%m);
+    var name={60:'1m',180:'3m',300:'5m',600:'10m'}[m];
+    html += '<div style="display:flex;justify-content:space-between;padding:8px 10px;background:#0a0f3d;border-radius:8px;margin-bottom:4px;font-size:13px">';
+    html += '<span>'+name+' · seed '+seed+' · <b style="color:#9fc1ff">'+left+'s</b></span>';
+    html += '<span>'+digs.join(' ')+' · sum <b>'+sum+'</b> · '+(sum>=23?'Big':'Small')+'</span></div>';
+  });
+  html += '</div>';
+
+  var rp=Math.floor(Date.now()/30000);
+  var rn=_rouletteHash(rp);
+  var REDS=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+  var rc=rn===0?'Green':(REDS.has(rn)?'Red':'Black');
+  html += '<div style="margin-bottom:14px"><div style="font-weight:800;color:#ffd23f;margin-bottom:6px">🎰 Roulette (30s)</div>';
+  html += '<div style="padding:10px;background:#0a0f3d;border-radius:8px;font-size:14px">Period '+rp+' → <b style="font-size:20px">'+rn+'</b> · '+rc+' · '+(rn===0?'Zero':(rn%2?'Odd':'Even'))+'</div></div>';
+
+  html += '<div style="margin-bottom:14px"><div style="font-weight:800;color:#ffd23f;margin-bottom:6px">✈️ Crash Games</div>';
+  [['Aviator',1],['Axiator',2],['Cricket',3]].forEach(function(pair){
+    var live=getCrashLive(pair[0]==='Cricket'?'Cricket Crash':pair[0], pair[1], 15);
+    html += '<div style="display:flex;justify-content:space-between;padding:8px 10px;background:#0a0f3d;border-radius:8px;margin-bottom:4px;font-size:13px">';
+    html += '<span>'+pair[0]+' · <b style="color:#9fc1ff">'+live.left+'s</b></span>';
+    html += '<span style="font-weight:900;font-size:18px;color:'+(live.crash>=5?'#4be08a':live.crash>=2?'#ffd23f':'#ff6b6b')+'">'+live.crash+'x</span></div>';
+  });
+  html += '</div>';
+
+  html += '<div style="margin-bottom:14px"><div style="font-weight:800;color:#ffd23f;margin-bottom:6px">💣 Bomb Pro (Mines)</div>';
+  try{
+    if(window.MinesPro && window.MinesPro.getLive){
+      var ml=window.MinesPro.getLive();
+      if(ml && ml.cur){
+        html += '<div style="padding:10px;background:#0a0f3d;border-radius:8px;font-size:13px;margin-bottom:6px">';
+        html += '<div><b>Live Round #'+ml.cur.id+'</b> · '+ml.cur.stage+' · '+ml.cur.left+'s · '+ml.cur.minesCount+' bombs</div>';
+        html += '<div style="margin-top:6px">💣 Tiles: '+(ml.cur.bombTiles||[]).map(function(t){return '<span style="background:#ff3b5c;padding:2px 6px;border-radius:6px;margin:2px;display:inline-block">'+t+'</span>';}).join(' ')+'</div>';
+        if(ml.cur.bust) html += '<div style="margin-top:4px;color:#ff9a8f">💥 Bust step '+(ml.cur.bustStep)+' · safe '+ml.cur.safeSteps+' · '+ml.cur.multiplier+'x</div>';
+        else html += '<div style="margin-top:4px;color:#4be08a">Safe all · '+ml.cur.multiplier+'x</div>';
+        html += '</div>';
+      }
+      if(ml && ml.next){
+        html += '<div style="padding:10px;background:#0a0f3d;border-radius:8px;font-size:13px">';
+        html += '<div><b>Next #'+ml.next.id+'</b> · '+ml.next.minesCount+' bombs · starts in '+ml.next.startsIn+'s</div>';
+        html += '<div style="margin-top:6px">💣 Tiles: '+(ml.next.bombTiles||[]).map(function(t){return '<span style="background:#d83a3a66;border:1px solid #ff3b5c;padding:2px 6px;border-radius:6px;margin:2px;display:inline-block">'+t+'</span>';}).join(' ')+'</div>';
+        html += '</div>';
+      }
+    } else {
+      html += '<div style="opacity:.7;font-size:13px">MinesPro load nahi hua — pehle Bomb Pro ek baar kholo</div>';
+    }
+  }catch(e){
+    html += '<div style="color:#ff9a8f;font-size:13px">Mines error: '+(e.message||e)+'</div>';
+  }
+  html += '</div>';
+
+  html += '<div style="padding:12px;background:#1a1030;border-radius:10px;font-size:12px;opacity:.85">🐔 <b>Chicken Road (Murga)</b> & 🎲 <b>Ludo Rush</b> — har move pe crypto RNG; fixed period se predict nahi hota. Live Preview tab me current state dekho.</div>';
+
+  html += '</div>';
+  box.innerHTML = html;
+};
+
+window.runPredict = function(){
+  var g = (document.getElementById('predGame')||{}).value || 'colour';
+  var modeEl = document.getElementById('predMode');
+  var modeSec = modeEl ? +modeEl.value : 60;
+  var raw = (document.getElementById('predNum')||{}).value || '';
+  var box = document.getElementById('predOut');
+  if(!box) return;
+
+  if(g==='chicken'||g==='ludo'){
+    box.innerHTML = '<div style="background:#1a1030;border-radius:12px;padding:16px;font-size:14px">'
+      + (g==='chicken'
+        ? '<b>🐔 Chicken Road (Murga Run)</b><p style="margin-top:8px;opacity:.85">Har step pe crypto RNG — fixed period se next 10 steps predict nahi ho sakte.</p>'
+        : '<b>🎲 Ludo Rush</b><p style="margin-top:8px;opacity:.85">Dice rolls client-side crypto RNG se. Fixed period list nahi.</p>')
+      + '<p style="margin-top:10px"><button onclick="predAllSnapshot()" style="background:#2f8cff;border:0;color:#fff;padding:10px 14px;border-radius:8px;font-weight:700">All Games Snapshot</button></p></div>';
+    return;
+  }
+
+  if(g==='mines'){
+    try{
+      if(!window.MinesPro || !window.MinesPro.getLive){
+        box.innerHTML = '<div style="background:#2a0a12;border:1px solid #ff3b5c;border-radius:12px;padding:14px">Pehle Bomb Pro game ek baar open karo taaki MinesPro load ho, phir yahan Current dabao.</div>';
+        return;
+      }
+      var lv = window.MinesPro.getLive();
+      var html = '<div style="background:#12163d;border-radius:14px;padding:12px"><b>💣 Bomb Pro — Live + Next</b>';
+      html += '<div style="font-size:12px;opacity:.7;margin:6px 0 10px">Device-specific salt se rounds. Aage ke rounds Live Preview se update hote hain.</div>';
+      if(lv && lv.cur){
+        html += '<div style="background:#0a0f3d;border-radius:10px;padding:12px;margin-bottom:8px">';
+        html += '<div style="display:flex;justify-content:space-between"><b>Round #'+lv.cur.id+'</b><span>'+lv.cur.stage+' · '+lv.cur.left+'s</span></div>';
+        html += '<div style="margin-top:8px">Bombs: <b>'+lv.cur.minesCount+'</b></div>';
+        html += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">'+(lv.cur.bombTiles||[]).map(function(t){return '<span style="background:#ff3b5c;padding:3px 8px;border-radius:8px;font-weight:800">'+t+'</span>';}).join('')+'</div>';
+        html += '<div style="margin-top:8px">'+(lv.cur.bust?('💥 Bust @ step '+lv.cur.bustStep+' · Safe steps '+lv.cur.safeSteps+' · '+lv.cur.multiplier+'x'):('✅ Safe all · '+lv.cur.multiplier+'x'))+'</div>';
+        html += '</div>';
+      }
+      if(lv && lv.next){
+        html += '<div style="background:#0a0f3d;border-radius:10px;padding:12px">';
+        html += '<div style="display:flex;justify-content:space-between"><b>Next #'+lv.next.id+'</b><span>in '+lv.next.startsIn+'s</span></div>';
+        html += '<div style="margin-top:8px">Bombs: <b>'+lv.next.minesCount+'</b></div>';
+        html += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">'+(lv.next.bombTiles||[]).map(function(t){return '<span style="background:#d83a3a55;border:1px solid #ff3b5c;padding:3px 8px;border-radius:8px;font-weight:800">'+t+'</span>';}).join('')+'</div>';
+        html += '<div style="margin-top:8px">'+(lv.next.bust?('💥 Bust @ step '+lv.next.bustStep+' · Safe '+lv.next.safeSteps+' · '+lv.next.multiplier+'x'):('✅ Safe all · '+lv.next.multiplier+'x'))+'</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+      box.innerHTML = html;
+    }catch(e){
+      box.innerHTML = '<div style="color:#ff9a8f">Error: '+(e&&e.message||e)+'</div>';
+    }
+    return;
+  }
+
+  var start = predParsePeriod(raw, modeSec);
+  if(start===null || start===undefined || !isFinite(start)){
+    box.innerHTML = '<div style="background:#2a0a12;border:1px solid #ff3b5c;border-radius:12px;padding:14px;color:#ff9a8f">Valid period / seed number daalo (ya Current dabao)</div>';
+    return;
+  }
+  var html = '';
+  if(g==='colour'){
+    var rows = predictColour(modeSec, start, 10);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎨 Colour · next 10 from period '+start+'</b>';
+    html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<tr style="background:#0a0f3d"><th style="padding:8px 4px">#</th><th>Period</th><th>Num</th><th>Size</th><th>Odd/Even</th><th>Colour</th></tr>';
+    rows.forEach(function(r){
+      var colTxt = (r.cols||[]).join('+');
+      var colColor = (r.cols&&r.cols[0]==='Green')?'#4be08a':(r.cols&&r.cols[0]==='Red')?'#ff6b6b':'#c9a6f0';
+      html += '<tr style="border-bottom:1px solid #ffffff12"><td style="padding:8px 4px;text-align:center">'+r.i+'</td>';
+      html += '<td style="font-size:11px;padding:8px 4px">'+r.code+'<br><span style="opacity:.55">p='+r.period+'</span></td>';
+      html += '<td style="text-align:center;font-weight:900;font-size:18px;color:'+colColor+'">'+r.n+'</td>';
+      html += '<td style="text-align:center">'+(r.sz==='Big'?'<span style="color:#ffd23f;font-weight:800">Big</span>':'<span style="color:#5aa6ff;font-weight:800">Small</span>')+'</td>';
+      html += '<td style="text-align:center">'+r.odd+'</td>';
+      html += '<td style="text-align:center;color:'+colColor+';font-weight:700">'+colTxt+'</td></tr>';
+    });
+    html += '</table></div></div>';
+  } else if(g==='k3'){
+    var rows = predictK3(modeSec, start, 10);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎲 K3 · next 10 from seed '+start+'</b>';
+    html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<tr style="background:#0a0f3d"><th style="padding:8px">#</th><th>Seed</th><th>Dice</th><th>Sum</th><th>Big/Small</th><th>Odd/Even</th></tr>';
+    rows.forEach(function(r){
+      html += '<tr style="border-bottom:1px solid #ffffff12"><td style="padding:8px;text-align:center">'+r.i+'</td><td style="text-align:center">'+r.seed+'</td>';
+      html += '<td style="text-align:center;font-weight:800;font-size:16px">'+r.d.join(' + ')+'</td>';
+      html += '<td style="text-align:center;font-weight:900;font-size:18px">'+r.sum+'</td>';
+      html += '<td style="text-align:center">'+(r.big==='Big'?'<span style="color:#ffd23f;font-weight:800">Big</span>':'<span style="color:#5aa6ff;font-weight:800">Small</span>')+'</td>';
+      html += '<td style="text-align:center">'+r.odd+'</td></tr>';
+    });
+    html += '</table></div></div>';
+  } else if(g==='5d'){
+    var rows = predict5D(modeSec, start, 10);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>5️⃣ 5D · next 10 from seed '+start+'</b>';
+    html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<tr style="background:#0a0f3d"><th style="padding:8px">#</th><th>Seed</th><th>Digits</th><th>Sum</th><th>Big/Small</th><th>Odd/Even</th></tr>';
+    rows.forEach(function(r){
+      html += '<tr style="border-bottom:1px solid #ffffff12"><td style="padding:8px;text-align:center">'+r.i+'</td><td style="text-align:center">'+r.seed+'</td>';
+      html += '<td style="text-align:center;font-weight:800;letter-spacing:2px">'+r.d.join(' ')+'</td>';
+      html += '<td style="text-align:center;font-weight:900;font-size:18px">'+r.sum+'</td>';
+      html += '<td style="text-align:center">'+(r.big==='Big'?'<span style="color:#ffd23f;font-weight:800">Big</span>':'<span style="color:#5aa6ff;font-weight:800">Small</span>')+'</td>';
+      html += '<td style="text-align:center">'+r.odd+'</td></tr>';
+    });
+    html += '</table></div></div>';
+  } else if(g==='roulette'){
+    var rows = predictRoulette(start, 10);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎰 Roulette · next 10 from period '+start+'</b>';
+    html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<tr style="background:#0a0f3d"><th style="padding:8px">#</th><th>Period</th><th>Number</th><th>Color</th><th>Odd/Even</th><th>Range</th></tr>';
+    rows.forEach(function(r){
+      var c = r.color==='Green'?'#14b356':r.color==='Red'?'#ff6b6b':'#ccc';
+      html += '<tr style="border-bottom:1px solid #ffffff12"><td style="padding:8px;text-align:center">'+r.i+'</td>';
+      html += '<td style="font-size:11px">'+r.code+'<br><span style="opacity:.5">p='+r.period+'</span></td>';
+      html += '<td style="text-align:center;font-weight:900;font-size:20px;color:'+c+'">'+r.n+'</td>';
+      html += '<td style="text-align:center;color:'+c+';font-weight:800">'+r.color+'</td>';
+      html += '<td style="text-align:center">'+r.odd+'</td><td style="text-align:center">'+r.range+'</td></tr>';
+    });
+    html += '</table></div></div>';
+  } else {
+    var key = g==='aviator'?1:g==='axiator'?2:3;
+    var title = g==='aviator'?'Aviator':g==='axiator'?'Axiator':'Cricket Crash';
+    var rows = predictCrash(key, 15, start, 10);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>✈️ '+title+' · next 10 crashes from slot '+start+'</b>';
+    html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<tr style="background:#0a0f3d"><th style="padding:8px">#</th><th>Slot</th><th>Crash Multiplier</th></tr>';
+    rows.forEach(function(r){
+      var c = r.crash>=5?'#4be08a':r.crash>=2?'#ffd23f':'#ff6b6b';
+      html += '<tr style="border-bottom:1px solid #ffffff12"><td style="padding:8px;text-align:center">'+r.i+'</td><td style="text-align:center">'+r.slot+'</td>';
+      html += '<td style="text-align:center;font-weight:900;font-size:20px;color:'+c+'">'+r.crash+'x</td></tr>';
+    });
+    html += '</table></div></div>';
+  }
+  box.innerHTML = html;
+};
+
 function buildPreviewHTML(){
   var colours=getColourLive();
   var k3list=getK3All();
@@ -1023,6 +1460,7 @@ function showAdminUI(){
   const tabs = [
     ["dash","📊 Dashboard"],
     ["preview","🔮 Live Preview"],
+    ["predict","🎯 Predict"],
     ["users","👤 Users"],
     ["dep","⬇️ Deposits"],
     ["wd","⬆️ Withdrawals"],
@@ -1035,6 +1473,9 @@ function showAdminUI(){
   // DASHBOARD
   if(_adminTab==="preview"){
     body = buildPreviewHTML();
+  }
+  else if(_adminTab==="predict"){
+    body = buildPredictHTML();
   }
   else if(_adminTab==="dash"){
     body = `
