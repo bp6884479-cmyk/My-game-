@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="hi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a1fa8">
+<title>Colour Trading Pro</title>
+<script>(function(){try{var st=Object.keys(localStorage).some(function(k){return k.indexOf("sb-")===0}),au=/access_token=|[?&]code=/.test(location.hash+location.search);if(st||au){document.documentElement.className="chk";fetch("game.html").catch(function(){});fetch("three.min.js").catch(function(){})}}catch(e){}})()</script>
+<style>html,body{margin:0;height:100%;background:#0a0f3d}
+#ctpLoad{display:none;position:fixed;inset:0;z-index:100000;background:#0a0f3d;flex-direction:column;align-items:center;justify-content:center;color:#ffd23f;font:700 16px system-ui,sans-serif;gap:16px}
+#ctpLoad i{width:48px;height:48px;border:5px solid #ffd23f33;border-top-color:#ffd23f;border-radius:50%;animation:ctpS .8s linear infinite}
+@keyframes ctpS{to{transform:rotate(360deg)}}
+.chk #ctpLogin{visibility:hidden}.chk #ctpLoad{display:flex}
+#ctpLogin .w{position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at 50% 20%,#3b41e6 0,#1a1fa8 40%,#0a0f3d 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#fff;padding:16px;overflow:auto}#ctpLogin .tag{position:absolute;top:18px;right:18px;font-size:13px;font-weight:600;text-align:center}#ctpLogin .lg{width:100%;max-width:360px;height:230px;position:relative}#ctpLogin .lg canvas{width:100%;height:100%;display:block;touch-action:none}#ctpLogin .fb{font:900 40px/1.1 system-ui,sans-serif;text-align:center;color:#ffd23f;padding-top:50px}#ctpLogin .pt{letter-spacing:5px;font-weight:700;font-size:14px;margin:4px 0 18px}#ctpLogin .pt i{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 12px;vertical-align:middle}#ctpLogin .bx{width:100%;max-width:360px;background:#0d1550e6;border:2px solid #3fa0ff99;border-radius:24px;padding:20px 16px;box-shadow:0 0 30px #2f8cff55}#ctpLogin .bt{width:100%;display:flex;align-items:center;gap:14px;border:0;border-radius:18px;padding:14px 18px;margin-bottom:14px;text-align:left;cursor:pointer;box-shadow:0 5px 0 #0005}#ctpLogin .bt b{display:block;font-size:20px;font-weight:800}#ctpLogin .bt small{font-size:13px;opacity:.7;font-weight:600}#ctpLogin .bt span.t{flex:1}#ctpLogin .bt em{font-style:normal;font-size:24px;font-weight:700}#ctpLogin .gu{background:linear-gradient(180deg,#ffd23f,#f5a10c);color:#111}#ctpLogin .go{background:linear-gradient(180deg,#fff,#dde3f5);color:#111}#ctpLogin .ic{width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:30px}#ctpLogin .ft{display:flex;justify-content:space-between;font-size:11px;text-align:center;margin-top:4px}#ctpLogin .ft div{flex:1}#ctpLogin .ft div i{display:block;font-style:normal;font-size:22px;margin-bottom:4px}#ctpLogin .gl{letter-spacing:5px;font-weight:700;font-size:13px;margin-top:18px}#ctpErr{color:#ffb4b4;font-size:13px;text-align:center;min-height:16px;margin-top:6px}</style>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+</head><body>
+<div id="ctpLogin"><div class="w"><div class="tag">&#x1F451;<br>&mdash; Trade Colours &mdash;<br>Win Big</div><div class="lg" id="ctpLogo3d"><div class="fb">COLOUR<br>TRADING PRO</div></div><div class="pt">PREDICT<i style="background:#ff3b3b"></i>TRADE<i style="background:#2ee06a"></i>WIN</div>
+<div class="bx"><button id="ctpG" class="bt gu"><span class="ic">&#x1F464;</span><span class="t"><b>Guest Login</b><small>Play Now</small></span><em>&rsaquo;</em></button>
+<button id="ctpGo" class="bt go"><span class="ic"><svg width="32" height="32" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg></span><span class="t"><b>Login with Google</b><small>Fast &amp; Secure</small></span><em>&rsaquo;</em></button>
+<div class="ft"><div><i>&#x1F6E1;&#xFE0F;</i>Safe &amp; Secure</div><div><i>&#x26A1;</i>Fast Gameplay</div><div><i>&#x1F4CA;</i>Real Strategy</div><div><i>&#x1F3C6;</i>Be the Best</div></div><p id="ctpErr"></p></div><div class="gl">&mdash; GOOD LUCK! &mdash;</div></div></div>
+<div id="ctpLoad"><i></i><span id="ctpLoadT">Signing in...</span></div>
+<script>
+
+function logo3d(){
+var host=document.getElementById("ctpLogo3d");if(!host)return;
+var TH=window.THREE;
+function fb(){host.innerHTML='<div class="fb">COLOUR<br>TRADING PRO</div>'}
+if(!TH){fb();return}
+var R;try{R=new TH.WebGLRenderer({antialias:true,alpha:true})}catch(e){fb();return}
+R.setPixelRatio(Math.min(window.devicePixelRatio||1,2));R.setClearColor(0x000000,0);
+host.innerHTML="";host.appendChild(R.domElement);
+var sc=new TH.Scene(),cam=new TH.PerspectiveCamera(40,1.55,.1,50);cam.position.set(0,0,6.2);
+sc.add(new TH.AmbientLight(0xffffff,.75));
+var dl=new TH.DirectionalLight(0xffffff,.9);dl.position.set(2,3,5);sc.add(dl);
+var pl=new TH.PointLight(0x8a4fd8,1.2,14);pl.position.set(-3,1,3);sc.add(pl);
+var pl2=new TH.PointLight(0x2ee06a,.9,14);pl2.position.set(3,-1,3);sc.add(pl2);
+
+function mkTex(w,h,fn){var c=document.createElement("canvas");c.width=w;c.height=h;var t=new TH.CanvasTexture(c);t.anisotropy=4;return{c:c,x:c.getContext("2d"),t:t}}
+function glowTex(col){var c=document.createElement("canvas");c.width=c.height=128;var x=c.getContext("2d"),g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,col+"ff");g.addColorStop(.35,col+"66");g.addColorStop(1,col+"00");x.fillStyle=g;x.fillRect(0,0,128,128);return new TH.CanvasTexture(c)}
+
+var W=768,H=384;
+function drawText(x,mode,sh){
+x.clearRect(0,0,W,H);x.textAlign="center";x.textBaseline="middle";
+x.font="900 150px system-ui,Arial,sans-serif";
+if(mode==="back"){x.fillStyle="#7a4a00";x.fillText("COLOUR",W/2,112)}
+else{var g=x.createLinearGradient(0,40,0,185);g.addColorStop(0,"#fff7b8");g.addColorStop(.45,"#ffd23f");g.addColorStop(1,"#e8890a");x.fillStyle=g;x.fillText("COLOUR",W/2,112);x.lineWidth=3;x.strokeStyle="rgba(120,60,0,.55)";x.strokeText("COLOUR",W/2,112)}
+x.font="800 80px system-ui,Arial,sans-serif";
+if(mode==="back"){x.fillStyle="#1b2a7a";x.fillText("TRADING PRO",W/2,240)}
+else{var g2=x.createLinearGradient(0,200,0,280);g2.addColorStop(0,"#ffffff");g2.addColorStop(1,"#9fd0ff");x.fillStyle=g2;x.fillText("TRADING PRO",W/2,240)}
+if(mode!=="back"){
+var bw=110,gp=14,bx=W/2-(bw*3+gp*2)/2,cs=["#ff3b3b","#2ee06a","#a855f7"];
+for(var i=0;i<3;i++){x.fillStyle=cs[i];x.beginPath();if(x.roundRect)x.roundRect(bx+i*(bw+gp),310,bw,14,7);else x.rect(bx+i*(bw+gp),310,bw,14);x.fill()}
+x.globalCompositeOperation="source-atop";
+var px=sh*(W+500)-250,hg=x.createLinearGradient(px-90,0,px+90,0);hg.addColorStop(0,"rgba(255,255,255,0)");hg.addColorStop(.5,"rgba(255,255,255,.75)");hg.addColorStop(1,"rgba(255,255,255,0)");
+x.fillStyle=hg;x.fillRect(0,0,W,H);x.globalCompositeOperation="source-over"}
+}
+var front=mkTex(W,H),back=mkTex(W,H);drawText(back.x,"back",0);back.t.needsUpdate=true;drawText(front.x,"front",-1);front.t.needsUpdate=true;
+
+var grp=new TH.Group();sc.add(grp);
+var TW=5.0,TH2=TW*H/W;
+var N=8;
+for(var i=0;i<N;i++){var m=new TH.Mesh(new TH.PlaneGeometry(TW,TH2),new TH.MeshBasicMaterial({map:back.t,transparent:true,alphaTest:.35,color:new TH.Color().setHSL(.09,.9,.28+.02*i)}));m.position.z=-.025*(i+1);grp.add(m)}
+var fm=new TH.Mesh(new TH.PlaneGeometry(TW,TH2),new TH.MeshBasicMaterial({map:front.t,transparent:true}));fm.position.z=.02;grp.add(fm);
+
+var halo=new TH.Sprite(new TH.SpriteMaterial({map:glowTex("#5a6bff"),transparent:true,blending:TH.AdditiveBlending,depthWrite:false,opacity:.85}));halo.scale.set(8,4.2,1);halo.position.z=-.6;sc.add(halo);
+
+var ring=new TH.Group();ring.rotation.x=1.18;ring.rotation.z=-.16;sc.add(ring);
+var torus=new TH.Mesh(new TH.TorusGeometry(2.9,.03,16,160),new TH.MeshStandardMaterial({color:0xffd23f,metalness:.9,roughness:.25,emissive:0x553300,emissiveIntensity:.5}));ring.add(torus);
+var cols=[0xff3b3b,0x2ee06a,0xa855f7],hex=["#ff3b3b","#2ee06a","#a855f7"],orbs=[];
+for(var k=0;k<3;k++){var o=new TH.Group();var b=new TH.Mesh(new TH.SphereGeometry(.24,32,24),new TH.MeshStandardMaterial({color:cols[k],emissive:cols[k],emissiveIntensity:.7,metalness:.3,roughness:.2}));o.add(b);var gl=new TH.Sprite(new TH.SpriteMaterial({map:glowTex(hex[k]),transparent:true,blending:TH.AdditiveBlending,depthWrite:false}));gl.scale.set(1.5,1.5,1);o.add(gl);ring.add(o);orbs.push(o)}
+
+var NP=90,pg=new TH.BufferGeometry(),pa=new Float32Array(NP*3);
+for(var j=0;j<NP;j++){pa[j*3]=(Math.random()-.5)*7;pa[j*3+1]=(Math.random()-.5)*3.6;pa[j*3+2]=(Math.random()-.5)*3}
+pg.setAttribute("position",new TH.BufferAttribute(pa,3));
+var pts=new TH.Points(pg,new TH.PointsMaterial({color:0xffe08a,size:.06,transparent:true,opacity:.85,blending:TH.AdditiveBlending,depthWrite:false}));sc.add(pts);
+
+var mx=0,my=0;
+function pm(e){var r=host.getBoundingClientRect();mx=((e.clientX-r.left)/r.width-.5)*2;my=((e.clientY-r.top)/r.height-.5)*2}
+host.addEventListener("pointermove",pm);host.addEventListener("pointerdown",pm);
+function rs(){var w=host.clientWidth||340,h=host.clientHeight||220;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+rs();window.addEventListener("resize",rs);
+
+var t0=performance.now(),fr=0,cx=0,cy=0;
+function loop(){
+if(!host.isConnected){window.removeEventListener("resize",rs);R.dispose();return}
+requestAnimationFrame(loop);
+var t=(performance.now()-t0)/1000;fr++;
+cx+=(mx-cx)*.06;cy+=(my-cy)*.06;
+grp.rotation.y=Math.sin(t*.7)*.32+cx*.35;grp.rotation.x=Math.sin(t*.5)*.07+cy*.18;grp.position.y=Math.sin(t*1.3)*.07;
+ring.rotation.y=t*.15;torus.rotation.z=t*.2;
+for(var q=0;q<3;q++){var a=t*1.1+q*Math.PI*2/3;orbs[q].position.set(Math.cos(a)*2.9,Math.sin(a)*2.9,0);orbs[q].scale.setScalar(1+Math.sin(t*3+q)*.08)}
+halo.material.opacity=.7+Math.sin(t*1.5)*.15;
+var pp=pg.attributes.position.array;for(var u=0;u<NP;u++){pp[u*3+1]+=.004+(u%5)*.0008;if(pp[u*3+1]>1.8)pp[u*3+1]=-1.8}pg.attributes.position.needsUpdate=true;pts.rotation.y=t*.05;
+if(fr%2===0){drawText(front.x,"front",(t*.45)%1.6-.3);front.t.needsUpdate=true}
+R.render(sc,cam)}
+loop();
+}
+
+(function(){
+var SB=null,ready=null;
+try{ready=sessionStorage.getItem("ctp_ready")}catch(e){}
+function $(i){return document.getElementById(i)}
+function isGame(k){return k.indexOf("sb-")!==0&&k.indexOf("ctp_")!==0}
+function snap(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(isGame(k))o[k]=localStorage.getItem(k)||""}return o}
+function clearG(){Object.keys(snap()).forEach(function(k){localStorage.removeItem(k)})}
+function T(p,ms){return Promise.race([p,new Promise(function(_,rj){setTimeout(function(){rj(new Error("timeout"))},ms)})])}
+function wipe(){try{Object.keys(localStorage).forEach(function(k){if(k.indexOf("sb-")===0)localStorage.removeItem(k)})}catch(e){}try{SB.auth.signOut({scope:"local"}).catch(function(){})}catch(e){}}
+function msg(t){var e=$("ctpErr");if(e)e.textContent=t}
+function showLoad(t){$("ctpLoadT").textContent=t;document.documentElement.className="chk"}
+function hideLoad(){document.documentElement.className=""}
+function go(){location.replace("game.html")}
+async function loadAndStart(s){showLoad("Signing in... Loading game");var r={},ok=false;try{r=await T(SB.from("game_saves").select("data").eq("user_id",s.user.id).maybeSingle(),6000);ok=!r.error}catch(e){r={}}
+if(ok){clearG();if(r.data&&r.data.data){var d=r.data.data;for(var k in d)localStorage.setItem(k,d[k])}}
+sessionStorage.setItem("ctp_ready",s.user.id);history.replaceState(null,"",location.pathname);go()}
+function startLogo(){var sc=document.createElement("script");sc.src="three.min.js";sc.onload=function(){try{logo3d()}catch(e){}};document.head.appendChild(sc)}
+function prefetch(){["game.html"].forEach(function(u){try{fetch(u).catch(function(){})}catch(e){}})}
+function wire(){
+$("ctpGo").onclick=async function(){if(!SB)return msg("Thoda ruko, dobara try karo");msg("...");try{wipe();clearG();var r=await SB.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname,queryParams:{prompt:"select_account"}}});if(r.error)msg(r.error.message||"Google login fail")}catch(e){msg(String(e&&e.message||e))}};
+$("ctpG").onclick=async function(){if(!SB)return msg("Thoda ruko, dobara try karo");msg("...");wipe();clearG();var r;try{r=await T(SB.auth.signInAnonymously(),10000)}catch(e){return msg("Connection problem: "+e.message)}if(r.error)return msg(r.error.message);loadAndStart(r.data.session)}}
+async function boot(){
+wire();
+try{
+if(!window.supabase){hideLoad();msg("Internet check karo, dobara try karo");return}
+SB=window.supabase.createClient("https://msywestunkdbbvvkrldr.supabase.co","sb_publishable__LBthp6EoyaXl-nN3YvRuA_BhhHoTyd");window.__sb=SB;
+var stored=false;try{stored=Object.keys(localStorage).some(function(k){return k.indexOf("sb-")===0})}catch(e){}
+var hasAuth=/access_token=|[?&]code=/.test(location.hash+location.search);
+var em=(location.hash+"&"+location.search).match(/error_description=([^&]+)/);
+if(!stored&&!hasAuth){hideLoad();setTimeout(startLogo,30);setTimeout(prefetch,2000);return}
+setTimeout(function(){if(document.documentElement.className==="chk"){hideLoad();msg("Server slow hai, dobara try karo");setTimeout(startLogo,30)}},12000);
+var s=null,err=false;
+try{s=(await T(SB.auth.getSession(),3500)).data.session}catch(e){err=true}
+if(!s&&hasAuth){s=await new Promise(function(res){var done=false;try{SB.auth.onAuthStateChange(function(ev,ss){if(ss&&!done){done=true;res(ss)}})}catch(e){}setTimeout(function(){if(!done){done=true;res(null)}},9000)})}
+if(s){if(ready&&s.user.id===ready)go();else loadAndStart(s);return}
+if(err&&ready){go();return}
+try{sessionStorage.removeItem("ctp_ready")}catch(e){}
+hideLoad();setTimeout(startLogo,30);setTimeout(prefetch,2000);
+if(em)msg(decodeURIComponent(em[1].replace(/\+/g," ")));else if(hasAuth)msg("Google login complete nahi hua, dobara try karo")
+}catch(e){hideLoad();msg(String(e&&e.message||e))}
+}
+document.addEventListener("DOMContentLoaded",boot);
+})();
+</script>
+</body></html>
