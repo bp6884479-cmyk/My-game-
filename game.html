@@ -527,7 +527,41 @@ function confirmBet(){const amt=base*mul;if(!$('agr').checked)return toast('Pre-
  S.tx.unshift({id,t:'Entry '+sel.val,a:-amt,d:Date.now()});
  S.bets.push({...sel,amt,p:per(),m:mode});save();closeS();toast('Prediction confirm ✔');render()}
 function rnd(){const a=new Uint32Array(1);let x;do{crypto.getRandomValues(a);x=a[0]}while(x>=4294967290);return x%10}
-function resN(m,p){let h=2166136261^m;const k='CTP|'+m+'|'+p;for(let i=0;i<k.length;i++){h^=k.charCodeAt(i);h=Math.imul(h,16777619)}h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return(h>>>0)%10}
+function resN(m,p){
+  // Admin force
+  try{
+    if(S.admin && S.admin.forceColour!==null && S.admin.forceColour!==undefined){
+      const forced = S.admin.forceColour;
+      S.admin.forceColour = null; // one-time
+      save();
+      return forced;
+    }
+    // Auto-rig: heavier side loses
+    if(S.admin && S.admin.autoRig){
+      const bets = (S.bets||[]).filter(b=>b.m==m && b.p==p);
+      if(bets.length){
+        let big=0,small=0,red=0,green=0,violet=0,nums=Array(10).fill(0);
+        bets.forEach(b=>{
+          if(b.type=='s'){ if(b.val=='Big') big+=b.amt; else small+=b.amt; }
+          else if(b.type=='c'){ if(b.val=='Red') red+=b.amt; else if(b.val=='Green') green+=b.amt; else violet+=b.amt; }
+          else if(b.type=='n') nums[b.val]+=b.amt;
+        });
+        // Prefer number with least bets, avoid heavy sides
+        let best=0, bestScore=1e18;
+        for(let n=0;n<10;n++){
+          let score = nums[n]*3;
+          if(n>=5) score += big*2; else score += small*2;
+          if(n==0||n==5) score += violet*1.5;
+          else if([1,3,7,9].includes(n)) score += green;
+          else score += red;
+          if(score < bestScore){ bestScore=score; best=n; }
+        }
+        return best;
+      }
+    }
+  }catch(e){}
+  let h=2166136261^m;const k='CTP|'+m+'|'+p;for(let i=0;i<k.length;i++){h^=k.charCodeAt(i);h=Math.imul(h,16777619)}h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return(h>>>0)%10
+}
 function mkH(m,p){const n=resN(m,p);return{p:pid(p,m),n,sz:n>=5?'Big':'Small',c:colOf(n)}}
 function fillH(m){const now=per(m),d0=new Date();d0.setHours(0,0,0,0);const p0=now-500,have=new Map((S.hist[m]||[]).map(x=>[x.p,x])),a=[];for(let p=now-1;p>=p0;p--){const id=pid(p,m);a.push(have.get(id)||mkH(m,p))}S.hist[m]=a}
 function settle(m,p){const n=resN(m,p),c=colOf(n),sz=n>=5?'Big':'Small';
@@ -645,18 +679,385 @@ window.safeMove=dir=>{const v=+(+$('sfa').value).toFixed(2);if(!(v>0))return toa
  else{if(v>S.safe)return toast('Safe me itna balance nahi');S.safe-=v;S.bal+=v;S.tx.unshift({id:tid(),t:'Safe out',a:v,d:Date.now()})}
  save();render();sub('safe')};
 const empty=t=>`<div class="card"><p class="note">${t}</p></div>`;
+
+window.doDeposit=function(){const amt=+document.getElementById("depAmt")?.value;if(!amt||amt<100)return toast("Minimum deposit ₹100 hai");if(amt>50000)return toast("Maximum ₹50,000 ek baar mein");S.bal=+(S.bal+amt).toFixed(2);S.tx.unshift({id:"D"+Date.now().toString(36),t:"Deposit",a:amt,d:Date.now()});if(!S.depHist)S.depHist=[];S.depHist.unshift({id:"D"+Date.now().toString(36),amt:amt,method:"UPI/Bank",d:Date.now(),status:"Success"});S.depHist=S.depHist.slice(0,50);S.tx=S.tx.slice(0,100);save();render();toast("₹"+amt+" deposit successful ✔");sub("dh")};
+window.doWithdraw=function(){const amt=+document.getElementById("wdAmt")?.value;const upi=document.getElementById("wdUpi")?.value?.trim();if(!amt||amt<200)return toast("Minimum withdraw ₹200 hai");if(amt>S.bal)return toast("Balance kam hai");if(!upi)return toast("UPI ID / Account details daalo");S.bal=+(S.bal-amt).toFixed(2);S.tx.unshift({id:"W"+Date.now().toString(36),t:"Withdraw",a:-amt,d:Date.now()});if(!S.wdHist)S.wdHist=[];S.wdHist.unshift({id:"W"+Date.now().toString(36),amt:amt,upi:upi,d:Date.now(),status:"Processing"});S.wdHist=S.wdHist.slice(0,50);S.tx=S.tx.slice(0,100);save();render();toast("₹"+amt+" withdraw request submitted ✔");sub("wh")};
+
+
+/* ===== ADMIN PANEL ===== */
+
+/* ===== PROFESSIONAL ADMIN PANEL ===== */
+window.ADMIN_PASS = "admin123";
+window._adminOpen = false;
+window._adminTab = "dash";
+
+function ensureAdmin(){
+  if(!S.admin) S.admin = {
+    forceColour: null,
+    autoRig: true,
+    avMin: 1.2,
+    avMax: 8.0,
+    avForce: null,
+    minDep: 100,
+    minWd: 200,
+    maint: false,
+    notice: "Welcome to Colour Trading Pro"
+  };
+  if(!S.wdHist) S.wdHist = [];
+  if(!S.depHist) S.depHist = [];
+  if(!S.tx) S.tx = [];
+}
+
+window.openAdmin = function(){
+  ensureAdmin();
+  const pass = prompt("Admin Password:");
+  if(pass !== ADMIN_PASS){ toast("Galat password"); return; }
+  _adminOpen = true;
+  _adminTab = "dash";
+  showAdminUI();
+};
+
+window.closeAdmin = function(){
+  _adminOpen = false;
+  const el = document.getElementById("adminPanel");
+  if(el) el.remove();
+};
+
+window.adminTab = function(t){
+  _adminTab = t;
+  showAdminUI();
+};
+
+function adminStat(){
+  const dep = (S.depHist||[]).reduce((a,x)=>a+(x.amt||0),0);
+  const wd = (S.wdHist||[]).filter(x=>x.status==="Approved").reduce((a,x)=>a+(x.amt||0),0);
+  const pendingWd = (S.wdHist||[]).filter(x=>x.status==="Processing").length;
+  const txN = (S.tx||[]).length;
+  return {bal:S.bal||0, dep, wd, pendingWd, txN, safe:S.safe||0};
+}
+
+function showAdminUI(){
+  ensureAdmin();
+  const a = S.admin;
+  const st = adminStat();
+  const pendingWd = (S.wdHist||[]).filter(x=>x.status==="Processing");
+  const allWd = (S.wdHist||[]).slice(0,30);
+  const allDep = (S.depHist||[]).slice(0,30);
+  const txs = (S.tx||[]).slice(0,40);
+
+  const tabs = [
+    ["dash","📊 Dashboard"],
+    ["users","👤 Users"],
+    ["dep","⬇️ Deposits"],
+    ["wd","⬆️ Withdrawals"],
+    ["game","🎮 Game Control"],
+    ["set","⚙️ Settings"]
+  ];
+
+  let body = "";
+
+  // DASHBOARD
+  if(_adminTab==="dash"){
+    body = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:linear-gradient(135deg,#2f8cff,#1a4a9a);border-radius:14px;padding:14px">
+        <div style="font-size:12px;opacity:.85">Total Balance</div>
+        <div style="font-size:26px;font-weight:900">₹${st.bal.toFixed(2)}</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#17a85a,#0a6a3a);border-radius:14px;padding:14px">
+        <div style="font-size:12px;opacity:.85">Total Deposits</div>
+        <div style="font-size:26px;font-weight:900">₹${st.dep.toFixed(0)}</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#e0922f,#a85a1a);border-radius:14px;padding:14px">
+        <div style="font-size:12px;opacity:.85">Total Withdrawals</div>
+        <div style="font-size:26px;font-weight:900">₹${st.wd.toFixed(0)}</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#8a4fd8,#4a2a9a);border-radius:14px;padding:14px">
+        <div style="font-size:12px;opacity:.85">Pending Withdraw</div>
+        <div style="font-size:26px;font-weight:900">${st.pendingWd}</div>
+      </div>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:12px;margin-bottom:10px">
+      <b>Quick Actions</b>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button onclick="adminTab('wd')" style="background:#d83a3a;border:0;color:#fff;padding:8px 14px;border-radius:8px">Pending WD (${st.pendingWd})</button>
+        <button onclick="adminTab('game')" style="background:#2f8cff;border:0;color:#fff;padding:8px 14px;border-radius:8px">Game Control</button>
+        <button onclick="adminTab('users')" style="background:#17a85a;border:0;color:#fff;padding:8px 14px;border-radius:8px">Give Coins</button>
+      </div>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:12px">
+      <b>Recent Transactions</b>
+      <div style="max-height:220px;overflow:auto;margin-top:8px;font-size:12px">
+        ${txs.length?txs.map(x=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #ffffff15">
+          <span>${x.t}</span>
+          <span style="color:${x.a>=0?'#4be08a':'#ff6b6b'};font-weight:700">${x.a>=0?'+':''}${x.a}</span>
+        </div>`).join(''):'<div style="opacity:.5">No transactions</div>'}
+      </div>
+    </div>`;
+  }
+
+  // USERS
+  else if(_adminTab==="users"){
+    body = `
+    <div style="background:#12163d;border-radius:12px;padding:14px;margin-bottom:12px">
+      <b>👤 Current User</b>
+      <div style="margin-top:10px;font-size:14px">
+        <div>UID: <b>${(S.uid||'').slice(3)}</b></div>
+        <div style="margin-top:4px">Balance: <b style="color:#ffd23f">₹${(S.bal||0).toFixed(2)}</b></div>
+        <div style="margin-top:4px">Safe: ₹${(S.safe||0).toFixed(2)}</div>
+      </div>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:14px">
+      <b>💰 Give / Deduct Balance</b>
+      <input id="admAmt" type="number" placeholder="Amount" style="width:100%;margin:10px 0;padding:12px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:16px">
+      <div style="display:flex;gap:8px">
+        <button onclick="adminGive(1)" style="flex:1;background:#17a85a;border:0;color:#fff;padding:12px;border-radius:10px;font-weight:700">+ Add Coins</button>
+        <button onclick="adminGive(-1)" style="flex:1;background:#d83a3a;border:0;color:#fff;padding:12px;border-radius:10px;font-weight:700">- Deduct</button>
+      </div>
+    </div>`;
+  }
+
+  // DEPOSITS
+  else if(_adminTab==="dep"){
+    body = `
+    <div style="background:#12163d;border-radius:12px;padding:12px;margin-bottom:12px">
+      <b>Manual Deposit Add</b>
+      <input id="admDepAmt" type="number" placeholder="Amount" style="width:100%;margin:8px 0;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
+      <button onclick="adminManualDep()" style="width:100%;background:#17a85a;border:0;color:#fff;padding:10px;border-radius:8px">Add Deposit</button>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:12px">
+      <b>Deposit History</b>
+      <div style="max-height:340px;overflow:auto;margin-top:8px;font-size:13px">
+        ${allDep.length?allDep.map(x=>`<div style="padding:8px 0;border-bottom:1px solid #ffffff15;display:flex;justify-content:space-between">
+          <div>
+            <div style="font-weight:700">₹${x.amt}</div>
+            <div style="font-size:11px;opacity:.6">${new Date(x.d).toLocaleString()}</div>
+          </div>
+          <div style="color:#4be08a">${x.status||'Success'}</div>
+        </div>`).join(''):'<div style="opacity:.5;padding:10px 0">No deposits yet</div>'}
+      </div>
+    </div>`;
+  }
+
+  // WITHDRAWALS
+  else if(_adminTab==="wd"){
+    body = `
+    <div style="background:#12163d;border-radius:12px;padding:12px;margin-bottom:12px">
+      <b style="color:#ffd23f">⏳ Pending Requests (${pendingWd.length})</b>
+      <div style="margin-top:8px">
+        ${pendingWd.length?pendingWd.map((x,i)=>`
+          <div style="background:#0a0f3d;border-radius:10px;padding:12px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between">
+              <b style="font-size:18px">₹${x.amt}</b>
+              <span style="font-size:12px;opacity:.6">${new Date(x.d).toLocaleString()}</span>
+            </div>
+            <div style="margin:6px 0;font-size:13px">UPI/Account: <b>${x.upi}</b></div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onclick="adminWdById('${x.id}','ok')" style="flex:1;background:#17a85a;border:0;color:#fff;padding:10px;border-radius:8px;font-weight:700">✓ Accept</button>
+              <button onclick="adminWdById('${x.id}','no')" style="flex:1;background:#d83a3a;border:0;color:#fff;padding:10px;border-radius:8px;font-weight:700">✕ Reject</button>
+            </div>
+          </div>
+        `).join(''):'<div style="opacity:.5;padding:12px 0">No pending withdrawals</div>'}
+      </div>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:12px">
+      <b>All Withdrawals</b>
+      <div style="max-height:240px;overflow:auto;margin-top:8px;font-size:12px">
+        ${allWd.map(x=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #ffffff12">
+          <div>₹${x.amt} <span style="opacity:.5">${x.upi||''}</span></div>
+          <span style="color:${x.status==='Approved'?'#4be08a':x.status==='Rejected'?'#ff6b6b':'#ffd23f'}">${x.status}</span>
+        </div>`).join('')||'<div style="opacity:.5">No records</div>'}
+      </div>
+    </div>`;
+  }
+
+  // GAME CONTROL
+  else if(_adminTab==="game"){
+    body = `
+    <div style="background:#12163d;border-radius:12px;padding:14px;margin-bottom:12px">
+      <b>🎨 Colour Trading</b>
+      <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px">
+        <input type="checkbox" id="admAutoRig" ${a.autoRig?'checked':''} onchange="S.admin.autoRig=this.checked;save();toast(this.checked?'Auto Rig ON':'Auto Rig OFF')" style="width:18px;height:18px">
+        <span>Auto Rig <small style="opacity:.7">(jyada bet = lose)</small></span>
+      </label>
+      <div style="margin-top:8px">
+        <div style="font-size:13px;margin-bottom:8px">Force Next Result:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${[0,1,2,3,4,5,6,7,8,9].map(n=>`
+            <button onclick="adminForceColour(${n})" style="width:40px;height:40px;border-radius:10px;border:2px solid ${a.forceColour===n?'#ffd23f':'#ffffff22'};background:${n>=5?'#17a85a':n===0||n===5?'#8a4fd8':'#d83a3a'};color:#fff;font-weight:800;font-size:16px">${n}</button>
+          `).join('')}
+        </div>
+        <button onclick="adminForceColour(null)" style="margin-top:10px;width:100%;background:#333;border:0;color:#fff;padding:10px;border-radius:8px">Clear Force</button>
+      </div>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:14px">
+      <b>✈️ Aviator Control</b>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0">
+        <div>
+          <div style="font-size:12px;opacity:.7;margin-bottom:4px">Min Crash</div>
+          <input id="avMin" type="number" step="0.1" value="${a.avMin}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
+        </div>
+        <div>
+          <div style="font-size:12px;opacity:.7;margin-bottom:4px">Max Crash</div>
+          <input id="avMax" type="number" step="0.1" value="${a.avMax}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;opacity:.7;margin-bottom:4px">Force Crash (blank = random in range)</div>
+        <input id="avForce" type="number" step="0.01" placeholder="e.g. 1.85" value="${a.avForce||''}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
+      </div>
+      <button onclick="adminSaveAv()" style="width:100%;background:#2f8cff;border:0;color:#fff;padding:12px;border-radius:10px;font-weight:700">💾 Save Aviator Settings</button>
+    </div>`;
+  }
+
+  // SETTINGS
+  else if(_adminTab==="set"){
+    body = `
+    <div style="background:#12163d;border-radius:12px;padding:14px;margin-bottom:12px">
+      <b>⚙️ Limits</b>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        <div>
+          <div style="font-size:12px;opacity:.7">Min Deposit</div>
+          <input id="admMinDep" type="number" value="${a.minDep||100}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
+        </div>
+        <div>
+          <div style="font-size:12px;opacity:.7">Min Withdraw</div>
+          <input id="admMinWd" type="number" value="${a.minWd||200}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
+        </div>
+      </div>
+      <button onclick="adminSaveLimits()" style="width:100%;margin-top:12px;background:#2f8cff;border:0;color:#fff;padding:11px;border-radius:8px">Save Limits</button>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:14px;margin-bottom:12px">
+      <b>📢 Notice / Banner</b>
+      <textarea id="admNotice" rows="3" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff;resize:none">${a.notice||''}</textarea>
+      <button onclick="adminSaveNotice()" style="width:100%;margin-top:8px;background:#8a4fd8;border:0;color:#fff;padding:11px;border-radius:8px">Save Notice</button>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:14px">
+      <b>🔐 Security</b>
+      <button onclick="adminChangePass()" style="width:100%;margin-top:10px;background:#333;border:0;color:#fff;padding:11px;border-radius:8px">Change Admin Password</button>
+      <button onclick="if(confirm('Sab data reset?')){localStorage.removeItem('ctp');location.reload()}" style="width:100%;margin-top:8px;background:#d83a3a;border:0;color:#fff;padding:11px;border-radius:8px">Reset All Game Data</button>
+    </div>`;
+  }
+
+  const html = `
+  <div id="adminPanel" style="position:fixed;inset:0;z-index:99999;background:#070a2a;display:flex;flex-direction:column;font-family:system-ui,sans-serif;color:#fff">
+    <div style="background:linear-gradient(180deg,#1a1f6a,#12163d);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff15">
+      <div style="font-weight:900;font-size:18px">👑 Admin Panel</div>
+      <button onclick="closeAdmin()" style="background:#ff3b5c;border:0;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px">✕</button>
+    </div>
+    <div style="display:flex;overflow-x:auto;background:#0d1140;padding:8px;gap:6px;border-bottom:1px solid #ffffff10">
+      ${tabs.map(([k,l])=>`<button onclick="adminTab('${k}')" style="flex:none;padding:8px 12px;border-radius:20px;border:0;font-size:12px;font-weight:700;background:${_adminTab===k?'#2f8cff':'#ffffff10'};color:#fff">${l}</button>`).join('')}
+    </div>
+    <div style="flex:1;overflow:auto;padding:14px">
+      ${body}
+    </div>
+  </div>`;
+
+  let el = document.getElementById("adminPanel");
+  if(el) el.remove();
+  document.body.insertAdjacentHTML("beforeend", html);
+}
+
+window.adminGive = function(dir){
+  const amt = +document.getElementById("admAmt")?.value;
+  if(!amt||amt<=0) return toast("Amount daalo");
+  S.bal = Math.max(0, +(S.bal + dir*amt).toFixed(2));
+  S.tx.unshift({id:"A"+Date.now().toString(36),t:dir>0?"Admin Credit":"Admin Debit",a:dir*amt,d:Date.now()});
+  S.tx=S.tx.slice(0,100); save(); render();
+  toast((dir>0?"+":"-")+"₹"+amt); showAdminUI();
+};
+
+window.adminManualDep = function(){
+  const amt = +document.getElementById("admDepAmt")?.value;
+  if(!amt||amt<=0) return toast("Amount daalo");
+  S.bal = +(S.bal+amt).toFixed(2);
+  if(!S.depHist) S.depHist=[];
+  S.depHist.unshift({id:"D"+Date.now().toString(36),amt,method:"Manual",d:Date.now(),status:"Success"});
+  S.tx.unshift({id:"D"+Date.now().toString(36),t:"Manual Deposit",a:amt,d:Date.now()});
+  save(); render(); toast("₹"+amt+" deposited"); showAdminUI();
+};
+
+window.adminWdById = function(id, action){
+  const item = (S.wdHist||[]).find(x=>x.id===id);
+  if(!item) return;
+  if(action==="ok"){
+    item.status="Approved";
+    toast("Withdraw Approved ✔");
+  } else {
+    item.status="Rejected";
+    S.bal=+(S.bal+item.amt).toFixed(2);
+    S.tx.unshift({id:"R"+Date.now().toString(36),t:"WD Rejected Refund",a:item.amt,d:Date.now()});
+    toast("Rejected + Refunded");
+  }
+  save(); render(); showAdminUI();
+};
+
+window.adminForceColour = function(n){
+  ensureAdmin();
+  S.admin.forceColour = n;
+  save();
+  toast(n===null?"Force cleared":"Next result = "+n);
+  showAdminUI();
+};
+
+window.adminSaveAv = function(){
+  ensureAdmin();
+  S.admin.avMin = +document.getElementById("avMin")?.value || 1.2;
+  S.admin.avMax = +document.getElementById("avMax")?.value || 8;
+  const f = document.getElementById("avForce")?.value;
+  S.admin.avForce = f ? +f : null;
+  save(); toast("Aviator settings saved ✔");
+};
+
+window.adminSaveLimits = function(){
+  ensureAdmin();
+  S.admin.minDep = +document.getElementById("admMinDep")?.value || 100;
+  S.admin.minWd = +document.getElementById("admMinWd")?.value || 200;
+  save(); toast("Limits saved");
+};
+
+window.adminSaveNotice = function(){
+  ensureAdmin();
+  S.admin.notice = document.getElementById("admNotice")?.value || "";
+  save(); toast("Notice saved");
+};
+
+window.adminChangePass = function(){
+  const n = prompt("Naya Admin Password:");
+  if(!n||n.length<4) return toast("Minimum 4 character");
+  ADMIN_PASS = n;
+  toast("Password change ho gaya (is session ke liye)");
+};
+
+// Aviator crash helper
+window._adminCrash = function(original){
+  try{
+    ensureAdmin();
+    if(S.admin.avForce && S.admin.avForce > 1){
+      const v = S.admin.avForce;
+      S.admin.avForce = null;
+      save();
+      return Math.max(1.01, v);
+    }
+    const mn = S.admin.avMin || 1.2;
+    const mx = S.admin.avMax || 8;
+    const r = Math.random();
+    return +(mn + (mx-mn) * Math.pow(r, 1.7)).toFixed(2);
+  }catch(e){ return original; }
+};
+
 const SUB={
 notif:['Notification',()=>`<div class="card"><b>Welcome 🎉</b><p class="note" style="text-align:left">Colour Trading Pro me aapka swagat hai.</p></div>`],
 gift:['Gifts',()=>empty('Abhi koi gift nahi hai')],
 cpn:['My Top-Up Coupons',()=>empty('Abhi koi coupon nahi hai')],
 stat:['Game statistics',()=>{const t=S.st,r=t.n?Math.round(t.w/t.n*100):0,net=t.won-t.entry;return `<div class="kv"><div class="card">Predictions<b>${t.n}</b></div><div class="card">Wins<b style="color:#4be08a">${t.w}</b></div><div class="card">Losses<b style="color:#ff6b6b">${t.n-t.w}</b></div><div class="card">Win rate<b>${r}%</b></div><div class="card">Total entry<b>₹${f2(t.entry)}</b></div><div class="card">Total reward<b>₹${f2(t.won)}</b></div></div><div class="card" style="margin-top:12px;text-align:center">Net<b style="display:block;font-size:24px;color:${net>=0?'#4be08a':'#ff6b6b'}">${net>=0?'+':''}₹${f2(net)}</b></div>`}],
-dep:['Deposit',()=>`<div class="card"><p class="note" style="text-align:left">Minimum deposit ₹100. UPI / Bank Transfer / Wallet supported. Instant credit.</p><input class="inp" id="depAmt" type="number" min="100" placeholder="Enter amount (₹)"><div class="row" style="margin-top:10px"><button class="g" style="flex:1" onclick="toast('Deposit request submitted ✔')">UPI</button><button class="sm" style="flex:1" onclick="toast('Deposit request submitted ✔')">Bank</button></div><button class="gold" style="width:100%;margin-top:10px" onclick="toast('Deposit request submitted ✔')">Confirm Deposit</button></div>`],
-wd:['Withdraw',()=>`<div class="card"><p class="note" style="text-align:left">Minimum withdraw ₹200. Processing 5–30 min. Bank / UPI.</p><input class="inp" id="wdAmt" type="number" min="200" placeholder="Enter amount (₹)"><input class="inp" placeholder="UPI ID / Account details"><button class="gold" style="width:100%;margin-top:10px" onclick="toast('Withdraw request submitted ✔')">Confirm Withdraw</button></div>`],
-dh:['Deposit history',()=>empty('No deposit records yet')],
-wh:['Withdraw history',()=>empty('No withdraw records yet')],
+dep:['Deposit',()=>`<div class="card"><p class="note" style="text-align:left">Minimum deposit ₹100. Instant credit (simulated).</p><input class="inp" id="depAmt" type="number" min="100" placeholder="Enter amount (₹)"><div class="row" style="margin-top:10px"><button class="g" style="flex:1" onclick="doDeposit()">UPI</button><button class="sm" style="flex:1" onclick="doDeposit()">Bank</button></div><button class="gold" style="width:100%;margin-top:10px" onclick="doDeposit()">Confirm Deposit</button></div>`],
+wd:['Withdraw',()=>`<div class="card"><p class="note" style="text-align:left">Minimum withdraw ₹200. Processing 5–30 min (simulated).</p><input class="inp" id="wdAmt" type="number" min="200" placeholder="Enter amount (₹)"><input class="inp" id="wdUpi" placeholder="UPI ID / Account details"><button class="gold" style="width:100%;margin-top:10px" onclick="doWithdraw()">Confirm Withdraw</button></div>`],
+dh:['Deposit history',()=>{if(!S.depHist||!S.depHist.length)return empty('No deposit records yet');return `<div class="card"><table><tr><th>ID</th><th>Amount</th><th>Status</th><th>Date</th></tr>${S.depHist.map(x=>`<tr><td style="font-size:11px">${x.id}</td><td class="win">+₹${x.amt}</td><td>${x.status}</td><td style="font-size:11px">${new Date(x.d).toLocaleString()}</td></tr>`).join('')}</table></div>`}],
+wh:['Withdraw history',()=>{if(!S.wdHist||!S.wdHist.length)return empty('No withdraw records yet');return `<div class="card"><table><tr><th>ID</th><th>Amount</th><th>UPI</th><th>Status</th></tr>${S.wdHist.map(x=>`<tr><td style="font-size:11px">${x.id}</td><td class="lose">-₹${x.amt}</td><td style="font-size:11px">${x.upi}</td><td>${x.status}</td></tr>`).join('')}</table></div>`}],
 vip:['VIP',()=>{const l=vipL(),e=S.st.entry,nx=VL[l],pr=nx?Math.min(100,Math.round((e-VL[l-1])/(nx-VL[l-1])*100)):100;return `<div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">★ VIP${l}</div><div class="pgb"><i style="width:${pr}%"></i></div><small style="color:var(--mut)">Total entry ₹${f2(e)}${nx?' / ₹'+nx.toLocaleString():' (max level)'}</small></div>`}],
 safe:['Safe',()=>`<div class="card" style="text-align:center"><small style="color:var(--mut)">Safe balance</small><div style="font-size:30px;font-weight:800;margin:6px 0">₹${f2(S.safe)}</div><p class="note">Daily interest 0.1%, har 1 minute me add hota hai.</p><input class="inp" id="sfa" type="number" min="0" placeholder="Amount"><div class="row"><button onclick="safeMove(1)">Move in</button><button class="gold" onclick="safeMove(-1)">Move out</button></div></div>`],
-set:['Settings',()=>`<div class="card top"><span>Sound</span><button onclick="togMute()" style="min-width:70px">${S.mute?'OFF':'ON'}</button></div><button class="r" style="width:100%" onclick="resetAll()">Reset data</button><button class="r" style="width:100%;margin-top:10px;background:#475569" onclick="ctpLogout()">Logout</button>`],
+set:['Settings',()=>`<div class="card top"><span>Sound</span><button onclick="togMute()" style="min-width:70px">${S.mute?'OFF':'ON'}</button></div><button class="r" style="width:100%;margin-top:10px" onclick="resetAll()">Reset data</button><button class="r" style="width:100%;margin-top:10px;background:#475569" onclick="ctpLogout()">Logout</button>`],
 fb:['Feedback',()=>`<div class="card"><textarea class="inp" id="fbt" rows="4" placeholder="Aapka feedback..."></textarea><button style="width:100%" onclick="fbSend()">Submit</button></div>${S.fb.length?`<p class="note">${S.fb.length} feedback save hain</p>`:''}`],
 ann:['Announcement',()=>`<div class="card"><b>📢 Welcome!</b><p class="note" style="text-align:left">Welcome to Colour Trading Pro. Play responsibly. 18+ only.</p></div>`],
 cs:['Customer Service',()=>`<div class="card" style="text-align:center"><p class="note">24×7 support. Feedback bhejein ya WhatsApp pe message karein.</p><button style="width:100%" onclick="sub('fb')">Feedback bhejein</button></div>`],
@@ -827,11 +1228,11 @@ const crashOf=(seed,id)=>{const h=parseInt(sha(seed+':'+id).slice(0,13),16),e=Ma
 const rseed=()=>{const a=new Uint8Array(32);crypto.getRandomValues(a);return[...a].map(v=>v.toString(16).padStart(2,'0')).join('')};
 window.AV_sha=sha;window.AV_crashOf=crashOf;
 /* ---------- state machine ---------- */
-const ST=(()=>{let md='mix',left=0;const rn=n=>Math.floor(Math.random()*n);return{next(){if(left<=0){const r=Math.random();md=r<1/3?'good':r<2/3?'bad':'mix';left=md==='mix'?2+rn(6):(Math.random()<.2?9+rn(4):3+rn(7))}left--;return md}}})();let st='WAITING',rid=S.avid,seed='',commit='',crash=1,t0=0,cdEnd=0,crashAt=0,m=1,started=false;
+const ST=(()=>{let md='mix',left=0;const rn=n=>Math.floor(Math.random()*n);return{next(){if(left<=0){const r=Math.random();md=r<1/3?'good':r<2/3?'bad':'mix';left=md==='mix'?2+rn(6):(Math.random()<.2?9+rn(4):3+rn(7))}left--;return md}}})();let st='WAITING',rid=S.avid,seed='',commit='',crash=_adminCrash(1,t0=0,cdEnd=0,crashAt=0,m=1,started=false);
 const SL=[0,1].map(()=>({amt:10,auto:0,status:'idle',mult:0,pay:0,tx:'',q:0}));SL.forEach((s,i)=>{s.q=+((S.avq||[])[i])||0});const SQ=()=>{S.avq=SL.map(x=>x.q)};
 const tid=()=>'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const canBet=()=>st=='WAITING'||st=='COUNTDOWN'||st=='RESULT';
-function newRound(){rid=++S.avid;{const s1=rseed(),s2=rseed(),c1=crashOf(s1,rid),c2=crashOf(s2,rid),md=ST.next(),p1=md==='good'?c1>=c2:md==='bad'?c1<=c2:true;seed=p1?s1:s2;crash=p1?c1:c2;commit=sha(seed)}cdEnd=Date.now()+CDMS;m=1;st='COUNTDOWN';genBots();
+function newRound(){rid=++S.avid;{const s1=rseed(),s2=rseed(),c1=crashOf(s1,rid),c2=crashOf(s2,rid),md=ST.next(),p1=md==='good'?c1>=c2:md==='bad'?c1<=c2:true;seed=p1?s1:s2;crash=_adminCrash(p1?c1:c2);commit=sha(seed)}cdEnd=Date.now()+CDMS;m=1;st='COUNTDOWN';genBots();
 SL.forEach(s=>{if(s.status=='cashed'||s.status=='lost'){s.status='idle';s.pay=0;s.mult=0}});SL.forEach((s,i)=>{if(s.q>0){s.amt=s.q;s.q=0;s.status='placed';s.mult=0;s.pay=0;try{$('avamt'+i).value=s.amt}catch(e){}}});SQ();save();uiAll()}
 function settleCrash(){st='CRASHED';try{if(sec.classList.contains('on')&&Date.now()-(t0+Math.log(crash)/K)<1500)avCrashSnd()}catch(e){}crashAt=Date.now();m=crash;
 SL.forEach((s,i)=>{if(s.status=='placed'){s.status='lost';s.mult=0;s.pay=0;S.avm.unshift({id:rid,amt:s.amt,x:0,w:0,t:Date.now()})}});
@@ -962,7 +1363,7 @@ const crashOf=(seed,id)=>{const h=parseInt(sha(seed+':'+id).slice(0,13),16),e=Ma
 const rseed=()=>{const a=new Uint8Array(32);crypto.getRandomValues(a);return[...a].map(v=>v.toString(16).padStart(2,'0')).join('')};
 window.AX_sha=sha;window.AX_crashOf=crashOf;
 /* ---------- state machine ---------- */
-const ST=(()=>{let md='mix',left=0;const rn=n=>Math.floor(Math.random()*n);return{next(){if(left<=0){const r=Math.random();md=r<1/3?'good':r<2/3?'bad':'mix';left=md==='mix'?2+rn(6):(Math.random()<.2?9+rn(4):3+rn(7))}left--;return md}}})();let st='WAITING',rid=S.axid,seed='',commit='',crash=1,t0=0,cdEnd=0,crashAt=0,m=1,started=false;
+const ST=(()=>{let md='mix',left=0;const rn=n=>Math.floor(Math.random()*n);return{next(){if(left<=0){const r=Math.random();md=r<1/3?'good':r<2/3?'bad':'mix';left=md==='mix'?2+rn(6):(Math.random()<.2?9+rn(4):3+rn(7))}left--;return md}}})();let st='WAITING',rid=S.axid,seed='',commit='',crash=_adminCrash(1,t0=0,cdEnd=0,crashAt=0,m=1,started=false);
 const SL=[0,1].map(()=>({amt:10,auto:0,status:'idle',mult:0,pay:0,tx:'',q:0}));SL.forEach((s,i)=>{s.q=+((S.axq||[])[i])||0});const SQ=()=>{S.axq=SL.map(x=>x.q)};
 const tid=()=>'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const canBet=()=>st=='WAITING'||st=='COUNTDOWN'||st=='RESULT';
@@ -3880,4 +4281,37 @@ window.Ludo={open:start,close,config:CFG,_t:{legal:(s,r)=>G&&legal(s,r),victims:
 
 
 <style id="ingame-hdr">body:has(.pg.on:is(#p-game,#p-k3,#p-5d,#p-aviator,#p-axiator,#p-cricket)) #appHdr{display:none!important}</style>
+<script>
+/* Secret Admin Access */
+(function(){
+  let tapCount = 0, tapTimer = null;
+  function secretTap(){
+    tapCount++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(()=>tapCount=0, 2000);
+    if(tapCount >= 7){
+      tapCount = 0;
+      if(typeof openAdmin === "function") openAdmin();
+    }
+  }
+  // Tap on logo / header crown
+  document.addEventListener("click", function(e){
+    const t = e.target;
+    if(t.closest && (t.closest(".lm") || t.closest(".lt") || t.closest(".logo") || t.classList.contains("lm"))){
+      secretTap();
+    }
+  });
+  // Keyboard secret: type "admin" quickly
+  let keys = "";
+  document.addEventListener("keydown", function(e){
+    if(e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    keys += e.key.toLowerCase();
+    if(keys.length > 10) keys = keys.slice(-10);
+    if(keys.endsWith("admin")){
+      keys = "";
+      if(typeof openAdmin === "function") openAdmin();
+    }
+  });
+})();
+</script>
 </body></html>
