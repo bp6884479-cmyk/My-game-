@@ -118,7 +118,7 @@ $("ctpG").onclick=async function(){if(!SB)return msg("Thoda ruko, dobara try kar
 async function boot(){
 wire();
 try{
-if(!window.supabase){hideLoad();msg("Internet check karo, dobara try karo");return}
+if(!window.supabase){hideLoad();msg("Internet check karo, dobara try karo");setTimeout(startLogo,30);return}
 SB=window.supabase.createClient("https://msywestunkdbbvvkrldr.supabase.co","sb_publishable__LBthp6EoyaXl-nN3YvRuA_BhhHoTyd");window.__sb=SB;
 var stored=false;try{stored=Object.keys(localStorage).some(function(k){return k.indexOf("sb-")===0})}catch(e){}
 var hasAuth=/access_token=|[?&]code=/.test(location.hash+location.search);
