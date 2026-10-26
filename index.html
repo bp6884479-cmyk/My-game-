@@ -134,8 +134,9 @@ if(s){if(ready&&s.user.id===ready)go();else loadAndStart(s);return}
 if(err&&ready){go();return}
 try{sessionStorage.removeItem("ctp_ready")}catch(e){}
 hideLoad();setTimeout(startLogo,30);setTimeout(prefetch,2000);
+var raw=(location.search+location.hash).replace(/(access_token|refresh_token|code)=[^&]+/g,"$1=...");
 if(hasAuth){try{history.replaceState(null,"",location.pathname)}catch(e){}}
-if(em)msg(decodeURIComponent(em[1].replace(/\+/g," ")));else if(hasAuth)msg("Google login complete nahi hua, dobara try karo")
+if(em)msg(decodeURIComponent(em[1].replace(/\+/g," ")));else if(hasAuth)msg("Google login fail. Screenshot bhejo: "+raw.slice(0,160)+" | stored="+stored)
 }catch(e){hideLoad();msg(String(e&&e.message||e))}
 }
 document.addEventListener("DOMContentLoaded",boot);
