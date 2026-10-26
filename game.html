@@ -527,17 +527,17 @@ function confirmBet(){const amt=base*mul;if(!$('agr').checked)return toast('Pre-
  S.tx.unshift({id,t:'Entry '+sel.val,a:-amt,d:Date.now()});
  S.bets.push({...sel,amt,p:per(),m:mode});save();closeS();toast('Prediction confirm ✔');render()}
 function rnd(){const a=new Uint32Array(1);let x;do{crypto.getRandomValues(a);x=a[0]}while(x>=4294967290);return x%10}
-function resN(m,p){
+function resN(m,p,peek){
   // Admin force
   try{
-    if(S.admin && S.admin.forceColour!==null && S.admin.forceColour!==undefined){
+    if(S.admin && S.admin.forceColour!==null && S.admin.forceColour!==undefined && (!peek || p==per(m))){
       const forced = S.admin.forceColour;
-      S.admin.forceColour = null; // one-time
-      save();
+      if(!peek){S.admin.forceColour = null; // one-time
+      save();}
       return forced;
     }
     // Auto-rig: heavier side loses
-    if(S.admin && S.admin.autoRig){
+    if(false && S.admin && S.admin.autoRig){ /* disabled: result must depend only on period so prediction is always correct */
       const bets = (S.bets||[]).filter(b=>b.m==m && b.p==p);
       if(bets.length){
         let big=0,small=0,red=0,green=0,violet=0,nums=Array(10).fill(0);
@@ -825,7 +825,7 @@ function predictColour(modeSec, startPeriod, count){
   var out = [];
   for(var i=0;i<count;i++){
     var p = startPeriod + i;
-    var n = _previewColourHash(modeSec, p);
+    var n = resN(modeSec, p, true);
     out.push({
       i:i+1,
       period:p,
@@ -919,7 +919,7 @@ function buildPredictHTML(){
   html += '<input id="predNum" type="text" inputmode="numeric" placeholder="e.g. current period number" style="width:100%;margin:6px 0 10px;padding:12px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:15px;font-weight:700"/>';
   html += '<div style="display:flex;gap:8px;margin-bottom:8px">';
   html += '<button onclick="predFillCurrent()" style="flex:1;background:#ffffff18;border:0;color:#9fc1ff;padding:11px;border-radius:10px;font-weight:700">⏱ Current</button>';
-  html += '<button onclick="runPredict()" style="flex:1.4;background:linear-gradient(135deg,#2f8cff,#8a4fd8);border:0;color:#fff;padding:11px;border-radius:10px;font-weight:800">🔍 Predict Next 10</button>';
+  html += '<button onclick="runPredict()" style="flex:1.4;background:linear-gradient(135deg,#2f8cff,#8a4fd8);border:0;color:#fff;padding:11px;border-radius:10px;font-weight:800">🔍 Check Result</button>';
   html += '</div>';
   html += '<div style="font-size:11px;opacity:.6;margin-bottom:4px">Colour auto-rig on hone par final result bets pe depend karta hai — yahan base hash dikhta hai. Chicken/Ludo pure live RNG hain.</div>';
   html += '</div>';
@@ -1178,8 +1178,8 @@ window.runPredict = function(){
   }
   var html = '';
   if(g==='colour'){
-    var rows = predictColour(modeSec, start, 10);
-    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎨 Colour · next 10 from period '+start+'</b>';
+    var rows = predictColour(modeSec, start, 1);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎨 Colour · result for period '+start+'</b>';
     html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<tr style="background:#0a0f3d"><th style="padding:8px 4px">#</th><th>Period</th><th>Num</th><th>Size</th><th>Odd/Even</th><th>Colour</th></tr>';
     rows.forEach(function(r){
@@ -1194,8 +1194,8 @@ window.runPredict = function(){
     });
     html += '</table></div></div>';
   } else if(g==='k3'){
-    var rows = predictK3(modeSec, start, 10);
-    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎲 K3 · next 10 from seed '+start+'</b>';
+    var rows = predictK3(modeSec, start, 1);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎲 K3 · result for seed '+start+'</b>';
     html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<tr style="background:#0a0f3d"><th style="padding:8px">#</th><th>Seed</th><th>Dice</th><th>Sum</th><th>Big/Small</th><th>Odd/Even</th></tr>';
     rows.forEach(function(r){
@@ -1207,8 +1207,8 @@ window.runPredict = function(){
     });
     html += '</table></div></div>';
   } else if(g==='5d'){
-    var rows = predict5D(modeSec, start, 10);
-    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>5️⃣ 5D · next 10 from seed '+start+'</b>';
+    var rows = predict5D(modeSec, start, 1);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>5️⃣ 5D · result for seed '+start+'</b>';
     html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<tr style="background:#0a0f3d"><th style="padding:8px">#</th><th>Seed</th><th>Digits</th><th>Sum</th><th>Big/Small</th><th>Odd/Even</th></tr>';
     rows.forEach(function(r){
@@ -1220,8 +1220,8 @@ window.runPredict = function(){
     });
     html += '</table></div></div>';
   } else if(g==='roulette'){
-    var rows = predictRoulette(start, 10);
-    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎰 Roulette · next 10 from period '+start+'</b>';
+    var rows = predictRoulette(start, 1);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>🎰 Roulette · result for period '+start+'</b>';
     html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<tr style="background:#0a0f3d"><th style="padding:8px">#</th><th>Period</th><th>Number</th><th>Color</th><th>Odd/Even</th><th>Range</th></tr>';
     rows.forEach(function(r){
@@ -1236,8 +1236,8 @@ window.runPredict = function(){
   } else {
     var key = g==='aviator'?1:g==='axiator'?2:3;
     var title = g==='aviator'?'Aviator':g==='axiator'?'Axiator':'Cricket Crash';
-    var rows = predictCrash(key, 15, start, 10);
-    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>✈️ '+title+' · next 10 crashes from slot '+start+'</b>';
+    var rows = predictCrash(key, 15, start, 1);
+    html += '<div style="background:#12163d;border-radius:14px;padding:12px"><b>✈️ '+title+' · crash for slot '+start+'</b>';
     html += '<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<tr style="background:#0a0f3d"><th style="padding:8px">#</th><th>Slot</th><th>Crash Multiplier</th></tr>';
     rows.forEach(function(r){
