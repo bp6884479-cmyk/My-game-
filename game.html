@@ -734,15 +734,31 @@ function getColourLive(){
   var modes=[{m:30,name:"30 Sec"},{m:60,name:"1 Min"},{m:180,name:"3 Min"},{m:300,name:"5 Min"}];
   var now=Math.floor(Date.now()/1000), list=[];
   modes.forEach(function(o){
-    var next=Math.floor(now/o.m)+1, left=o.m-(now%o.m), n;
+    // Match the active period used by the main Colour Trading game.
+    var period=Math.floor(now/o.m), left=o.m-(now%o.m), n;
     try{
-      if(S.admin && S.admin.forceColour!==null && S.admin.forceColour!==undefined) n=S.admin.forceColour;
-      else if(typeof resN==="function") n=resN(o.m, next);
-      else n=Math.floor(Math.random()*10);
+      // Show the forced number without consuming the one-time force setting.
+      if(S.admin && S.admin.forceColour!==null && S.admin.forceColour!==undefined){
+        n=S.admin.forceColour;
+      } else if(S.admin && S.admin.autoRig){
+        // The final auto-rig result depends on bets and is selected at settlement.
+        // Show the deterministic base result here instead of mutating game state.
+        n=_previewColourHash(o.m, period);
+      } else {
+        n=_previewColourHash(o.m, period);
+      }
     }catch(e){n=0;}
-    list.push({name:o.name,n:n,sz:n>=5?"Big":"Small",cols:_colOf(n),left:left,period:next});
+    list.push({name:o.name,n:n,sz:n>=5?"Big":"Small",cols:_colOf(n),left:left,period:period});
   });
   return list;
+}
+function _previewColourHash(m,p){
+  var h=2166136261^m;
+  var k='CTP|'+m+'|'+p;
+  for(var i=0;i<k.length;i++){h^=k.charCodeAt(i);h=Math.imul(h,16777619);}
+  h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;
+  h=Math.imul(h,0xc2b2ae35);h^=h>>>16;
+  return (h>>>0)%10;
 }
 
 function getK3All(){
@@ -1117,15 +1133,26 @@ function showAdminUI(){
     <div style="display:flex;overflow-x:auto;background:#0d1140;padding:8px;gap:6px;border-bottom:1px solid #ffffff10">
       ${tabs.map(([k,l])=>`<button onclick="adminTab('${k}')" style="flex:none;padding:8px 12px;border-radius:20px;border:0;font-size:12px;font-weight:700;background:${_adminTab===k?'#2f8cff':'#ffffff10'};color:#fff">${l}</button>`).join('')}
     </div>
-    <div style="flex:1;overflow:auto;padding:14px">
+    <div id="adminPanelContent" style="flex:1;overflow:auto;padding:14px">
       ${body}
     </div>
   </div>`;
 
   let el = document.getElementById("adminPanel");
+  if(el && _adminTab === "preview"){
+    // Update only the preview content; preserve the panel and scroll position.
+    let content = document.getElementById("adminPanelContent");
+    if(content){
+      const scrollTop = content.scrollTop;
+      content.innerHTML = body;
+      content.scrollTop = scrollTop;
+      return;
+    }
+  }
   if(el) el.remove();
   document.body.insertAdjacentHTML("beforeend", html);
 }
+window.showAdminUI = showAdminUI;
 
 window.adminGive = function(dir){
   const amt = +document.getElementById("admAmt")?.value;
@@ -4488,12 +4515,12 @@ window.Ludo={open:start,close,config:CFG,_t:{legal:(s,r)=>G&&legal(s,r),victims:
 </script>
 
 <script>
-/* Strong live timer - every 1 second */
+/* Update the Admin Live Preview once per second without rebuilding the panel. */
 (function(){
   setInterval(function(){
     try{
-      if(window._adminOpen && window._adminTab === "preview" && typeof showAdminUI === "function"){
-        showAdminUI();
+      if(window._adminOpen && window._adminTab === "preview" && typeof window.showAdminUI === "function"){
+        window.showAdminUI();
       }
     }catch(e){}
   }, 1000);
