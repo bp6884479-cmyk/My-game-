@@ -825,30 +825,94 @@ function buildPreviewHTML(){
   try{if(window.Roulette&&typeof window.Roulette.getLive==='function') rouletteLive=window.Roulette.getLive();}catch(e){}
 
   // BOMB PRO / MINES PRO
-  if(minesLive){
-    html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">💣 Bomb Pro / Mines Pro</b>';
-    html+='<div style="background:#0a0f3d;border:1px solid #ffffff18;border-radius:12px;padding:12px;margin-top:8px">';
-    html+='<div style="display:flex;justify-content:space-between;gap:10px"><b>Round status</b><span style="'+_tickStyle(minesLive.left)+'">'+minesLive.left+'s</span></div>';
-    html+='<div style="margin-top:7px;font-size:14px">'+minesLive.stage+' · '+minesLive.mines+' bombs / '+minesLive.totalTiles+' tiles</div>';
-    html+='</div></div>';
+  if(minesLive && minesLive.cur){
+    var cur = minesLive.cur;
+    var nxt = minesLive.next;
+    var low = cur.left <= 5;
+    html += '<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:15px">💣 Bomb Pro (Mines)</b>';
+    html += '<span style="font-size:11px;padding:2px 8px;border-radius:6px;background:#ffffff15;color:#ffd23f">Round #' + cur.id + '</span></div>';
+    
+    html += '<div style="background:' + (low ? "#2a0a12" : "#0a0f3d") + ';border:1.5px solid ' + (low ? "#ff3b5c" : "#ffffff18") + ';border-radius:12px;padding:12px;margin-top:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<b>' + cur.stage + ' (' + cur.minesCount + ' Bombs)</b>';
+    html += '<span style="' + _tickStyle(cur.left) + '">' + cur.left + 's</span>';
+    html += '</div>';
+    
+    html += '<div style="margin-top:10px">';
+    html += '<div style="font-size:12px;opacity:.75;margin-bottom:5px">💣 Live Bomb Locations (Tiles 1–24):</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    cur.bombTiles.forEach(function(b){
+      html += '<span style="background:#ff3b5c;color:#fff;font-weight:900;padding:3px 10px;border-radius:8px;font-size:13px;box-shadow:0 0 8px #ff3b5c55">Tile ' + b + '</span>';
+    });
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div style="display:flex;gap:8px;margin-top:10px;font-size:12px;flex-wrap:wrap">';
+    if(cur.bust){
+      html += '<span style="background:#ffffff15;padding:4px 8px;border-radius:6px;color:#ff9a8f">💥 Bust at Step ' + cur.bustStep + '</span>';
+      html += '<span style="background:#17a85a33;color:#4be08a;padding:4px 8px;border-radius:6px">Safe: ' + cur.safeSteps + ' steps (' + cur.multiplier + 'x)</span>';
+    } else {
+      html += '<span style="background:#17a85a44;color:#4be08a;padding:4px 8px;border-radius:6px">✓ All 21 tiles safe (' + cur.multiplier + 'x)</span>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    if(nxt){
+      html += '<div style="background:#070b28;border:1px dashed #ffd23f66;border-radius:12px;padding:11px;margin-top:8px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+      html += '<span style="font-size:12px;color:#ffd23f;font-weight:800">🔮 Agla Round #' + nxt.id + '</span>';
+      html += '<span style="font-size:12px;opacity:.8">Shuru hoga: <b>' + nxt.startsIn + 's mein</b></span>';
+      html += '</div>';
+      html += '<div style="font-size:12px;opacity:.85;margin-bottom:4px">💣 Agle Round Ke Bombs:</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+      nxt.bombTiles.forEach(function(b){
+        html += '<span style="background:#d83a3a44;border:1px solid #ff3b5c;color:#ff9a8f;font-weight:800;padding:2px 8px;border-radius:6px;font-size:12px">Tile ' + b + '</span>';
+      });
+      html += '</div>';
+      html += '<div style="margin-top:6px;font-size:11px;opacity:.75">' + (nxt.bust ? ('💥 Step ' + nxt.bustStep + ' pe bust hoga (Safe: ' + nxt.safeSteps + ' steps • ' + nxt.multiplier + 'x)') : 'Safe all steps') + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
   }
 
   // ROULETTE
-  if(rouletteLive){
-    var rouletteColor=rouletteLive.result===null?'#ffffff':(rouletteLive.result===0?'#4be08a':'#ffd23f');
-    html+='<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px"><b style="font-size:15px">🎰 European Roulette</b>';
-    html+='<div style="background:#0a0f3d;border:1px solid #ffffff18;border-radius:12px;padding:12px;margin-top:8px">';
-    html+='<div style="display:flex;justify-content:space-between;gap:10px"><b>'+rouletteLive.stage+'</b>';
-    if(rouletteLive.left!==null) html+='<span style="'+_tickStyle(rouletteLive.left)+'">'+rouletteLive.left+'s</span>';
-    html+='</div>';
-    if(rouletteLive.result!==null){
-      var rN=rouletteLive.result, rColor=rN===0?'Green':([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].indexOf(rN)>=0?'Red':'Black');
-      html+='<div style="margin-top:8px;font-size:24px;font-weight:900;color:'+rouletteColor+'">'+rN+' · '+rColor+'</div>';
-      if(!rouletteLive.active) html+='<div style="font-size:11px;opacity:.65;margin-top:3px">Last result · Roulette is not open</div>';
-    } else {
-      html+='<div style="margin-top:8px;font-size:13px;opacity:.75">Result appears when the spin starts.</div>';
+  if(rouletteLive && rouletteLive.result){
+    var rCur = rouletteLive.result;
+    var rNxt = rouletteLive.next ? rouletteLive.next.result : null;
+    var low = rouletteLive.left <= 5;
+    
+    html += '<div style="background:#12163d;border-radius:14px;padding:14px;margin-bottom:12px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:15px">🎰 European Roulette (30s Live)</b>';
+    html += '<span style="font-size:11px;padding:2px 8px;border-radius:6px;background:#ffffff15;color:#ffd23f">' + (rouletteLive.periodCode || ('Period ' + rouletteLive.period)) + '</span></div>';
+
+    html += '<div style="background:' + (low ? "#2a0a12" : "#0a0f3d") + ';border:1.5px solid ' + (low ? "#ff3b5c" : "#ffffff18") + ';border-radius:12px;padding:12px;margin-top:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<b>' + rouletteLive.stage + '</b>';
+    html += '<span style="' + _tickStyle(rouletteLive.left) + '">' + rouletteLive.left + 's</span>';
+    html += '</div>';
+
+    html += '<div style="display:flex;align-items:center;gap:14px;margin-top:10px">';
+    html += '<div style="width:52px;height:52px;border-radius:50%;background:' + rCur.hex + ';border:2px solid #ffd23f;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;box-shadow:0 0 12px ' + rCur.hex + '99">' + rCur.n + '</div>';
+    html += '<div>';
+    html += '<div style="font-size:17px;font-weight:900;color:' + (rCur.color === 'Green' ? '#4be08a' : rCur.color === 'Red' ? '#ff6b6b' : '#ffffff') + '">' + rCur.n + ' · ' + rCur.color.toUpperCase() + '</div>';
+    html += '<div style="font-size:12px;opacity:.8;margin-top:2px">' + (rCur.odd ? rCur.odd + ' • ' : '') + (rCur.range ? rCur.range : '') + '</div>';
+    html += '</div></div>';
+    html += '</div>';
+
+    if(rouletteLive.next && rNxt){
+      html += '<div style="background:#070b28;border:1px dashed #ffd23f66;border-radius:12px;padding:11px;margin-top:8px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+      html += '<span style="font-size:12px;color:#ffd23f;font-weight:800">🔮 Agla Round Preview (' + rouletteLive.next.periodCode + ')</span>';
+      html += '<span style="font-size:12px;opacity:.8">Starts in: <b>' + rouletteLive.next.startsIn + 's</b></span>';
+      html += '</div>';
+      html += '<div style="display:flex;align-items:center;gap:10px">';
+      html += '<div style="width:34px;height:34px;border-radius:50%;background:' + rNxt.hex + ';display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;color:#fff">' + rNxt.n + '</div>';
+      html += '<div style="font-size:13px;font-weight:800">' + rNxt.n + ' ' + rNxt.color + ' <span style="font-size:11px;opacity:.7">(' + (rNxt.odd || '') + ')</span></div>';
+      html += '</div>';
+      html += '</div>';
     }
-    html+='</div></div>';
+    html += '</div>';
   }
 
   // COLOUR
@@ -1122,6 +1186,17 @@ function showAdminUI(){
         <input id="avForce" type="number" step="0.01" placeholder="e.g. 1.85" value="${a.avForce||''}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
       </div>
       <button onclick="adminSaveAv()" style="width:100%;background:#2f8cff;border:0;color:#fff;padding:12px;border-radius:10px;font-weight:700">💾 Save Aviator Settings</button>
+    </div>
+    <div style="background:#12163d;border-radius:12px;padding:14px;margin-top:12px">
+      <b>🎰 European Roulette Control</b>
+      <div style="margin:10px 0">
+        <div style="font-size:12px;opacity:.7;margin-bottom:4px">Force Next Winning Number (0–36, blank = auto):</div>
+        <div style="display:flex;gap:8px">
+          <input id="rlForceInput" type="number" min="0" max="36" placeholder="0–36" value="${a.forceRoulette!==null&&a.forceRoulette!==undefined?a.forceRoulette:''}" style="flex:1;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff;font-size:16px">
+          <button onclick="var v=document.getElementById('rlForceInput').value;S.admin.forceRoulette=(v===''?null:parseInt(v));save();toast(v===''?'Roulette force cleared':'Roulette forced to '+v);showAdminUI()" style="background:#17a85a;border:0;color:#fff;padding:10px 16px;border-radius:8px;font-weight:700">Set</button>
+          <button onclick="S.admin.forceRoulette=null;save();toast('Roulette force cleared');showAdminUI()" style="background:#333;border:0;color:#fff;padding:10px 12px;border-radius:8px">Clear</button>
+        </div>
+      </div>
     </div>`;
   }
 
@@ -3150,7 +3225,21 @@ $$('rlBk').onclick=()=>close();
 /* ---------- round flow ---------- */
 function setPh(t){$$('rlPh').textContent=t}
 function newRound(){phase='bet';bets={};undo=[];res=null;endAt=Date.now()+BET_T*1000;cells.forEach(c=>c.classList.remove('rl-wn'));$$('rlRes').classList.remove('rl-on');setPh('Place your bets · Auto spin in 22s');paint()}
-function startSpin(){if(phase!='bet')return;phase='spin';rb={...bets};S.rlb={...bets};res=r37();ballIdx=ORDER.indexOf(res);const t=performance.now();setOm(1.4,t);spin={t0:t,res,idx:ballIdx};setPh('No more bets');sv();paint();bp(300,.3)}
+function getRouletteResultForPeriod(p){
+  try{
+    if(typeof S!=='undefined'&&S.admin&&S.admin.forceRoulette!==null&&S.admin.forceRoulette!==undefined&&S.admin.forceRoulette!==''){
+      var fr=parseInt(S.admin.forceRoulette);
+      if(fr>=0&&fr<=36) return fr;
+    }
+  }catch(e){}
+  var h=2166136261^37;
+  var k='ROULETTE|'+p;
+  for(var i=0;i<k.length;i++){h^=k.charCodeAt(i);h=Math.imul(h,16777619);}
+  h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;
+  h=Math.imul(h,0xc2b2ae35);h^=h>>>16;
+  return (h>>>0)%37;
+}
+function startSpin(){if(phase!='bet')return;phase='spin';rb={...bets};S.rlb={...bets};const p=Math.floor(Date.now()/30000);res=getRouletteResultForPeriod(p);ballIdx=ORDER.indexOf(res);const t=performance.now();setOm(1.4,t);spin={t0:t,res,idx:ballIdx};setPh('No more bets');sv();paint();bp(300,.3)}
 function finishSpin(){const n=res,t=performance.now();setOm(.35,t);spin=null;phase='result';let pay=0;Object.entries(rb||{}).forEach(([k,a])=>pay+=a*mult(k,n));pay=r2(pay);const stake=r2(Object.values(rb||{}).reduce((a,b)=>a+b,0));
 S.rlh=[n,...(S.rlh||[])].slice(0,50);S.rlp=[RLP(),...(S.rlp||[])].slice(0,50);S.rlt=Date.now();
 if(stake>0){S.bal=r2(S.bal+pay);S.st.n++;S.st.entry+=stake;S.st.won+=pay;if(pay>0){S.st.w++;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'Roulette Reward',a:pay,d:Date.now()});S.tx=S.tx.slice(0,100)}}
@@ -3207,13 +3296,45 @@ function openR(){S.rlh=S.rlh||[];{S.rlp=S.rlp||[];while(S.rlp.length<S.rlh.lengt
 function close(){if(phase=='spin')finishSpin();else if(phase=='bet'&&tot()){S.bal=r2(S.bal+tot());bets={};undo=[];sv()}open=false;$$('rl').classList.remove('rl-on');clearInterval(tmr);cancelAnimationFrame(raf);try{show('home')}catch(e){}}
 function getLive(){
   const now=Date.now();
-  if(!open){
-    const last=(S.rlh||[])[0];
-    return {active:false,stage:'Not open',left:null,result:(last===undefined?null:last)};
-  }
-  if(phase==='bet') return {active:true,stage:'Betting',left:Math.max(0,Math.ceil((endAt-now)/1000)),result:null};
-  if(phase==='spin') return {active:true,stage:'Spinning',left:Math.max(0,Math.ceil(SPIN_T-(performance.now()-spin.t0)/1000)),result:res};
-  return {active:true,stage:'Result',left:Math.max(0,Math.ceil((endAt-now)/1000)),result:res};
+  const cycle=30000;
+  const p=Math.floor(now/cycle);
+  const el=(now%cycle)/1000;
+  let stage,left;
+  if(el<22.5){stage='Betting';left=Math.max(0,Math.ceil(22.5-el));}
+  else if(el<27.5){stage='Spinning';left=Math.max(0,Math.ceil(27.5-el));}
+  else{stage='Result';left=Math.max(0,Math.ceil(30.0-el));}
+
+  const curNum=getRouletteResultForPeriod(p);
+  const nextNum=getRouletteResultForPeriod(p+1);
+  const d=new Date(p*cycle);
+  const curPeriodCode=d.getUTCFullYear()+String(d.getUTCMonth()+1).padStart(2,'0')+String(d.getUTCDate()).padStart(2,'0')+'R'+String(p%100000).padStart(6,'0');
+  const dNext=new Date((p+1)*cycle);
+  const nextPeriodCode=dNext.getUTCFullYear()+String(dNext.getUTCMonth()+1).padStart(2,'0')+String(dNext.getUTCDate()).padStart(2,'0')+'R'+String((p+1)%100000).padStart(6,'0');
+
+  const infoOf=n=>{
+    const isRed=REDS.has(n);
+    const c=n===0?'Green':isRed?'Red':'Black';
+    const odd=n===0?'Zero':(n%2?'Odd':'Even');
+    const range=n===0?'':(n<=18?'1–18 (Low)':'19–36 (High)');
+    return {n,color:c,odd,range,hex:n===0?'#14b356':isRed?'#e01636':'#222222'};
+  };
+
+  const startsInNext=left+(stage==='Betting'?(30-22.5):stage==='Spinning'?(30-27.5):0);
+
+  return {
+    period:p,
+    periodCode:curPeriodCode,
+    stage,
+    left,
+    active:open,
+    result:infoOf(curNum),
+    next:{
+      period:p+1,
+      periodCode:nextPeriodCode,
+      result:infoOf(nextNum),
+      startsIn:Math.ceil(startsInNext)
+    }
+  };
 }
 window.Roulette={open,close,getLive,_t:{mult,ORDER}};
 })();
@@ -4061,7 +4182,7 @@ window.CoinFlip={open,close,config:CF};
    a per-device secret salt + day + round number BEFORE the round starts and never changes. Ladder = fair-odds product floored to
    2 decimals (matches the reference screenshot for 3 mines; formula match only, NOT the original game's algorithm).
    Rounds come in good/bad/mix streaks whose long-run average equals fair odds. Real money would need server-side RNG + settlement. */
-const T=24,CFG={min:10,max:10000,betMs:7000,stepMs:600,endMs:3200};
+const T=24,CFG={min:10,max:10000,betMs:15000,stepMs:600,endMs:3200};
 const LAD=[10,20,50,100,200,500,1000,2000,5000,10000],MW=[3,3,3,3,3,3,3,2,4,4,5];
 const $=s=>document.getElementById(s),r2=n=>Math.round(n*100)/100,f2=n=>(+n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const LC={},ladder=m=>LC[m]||(LC[m]=(()=>{const a=[];let p=1;for(let k=0;k<T-m;k++){p*=(T-k)/(T-m-k);a.push(Math.floor(p*100+1e-9)/100)}return a})());
@@ -4182,7 +4303,44 @@ function getLive(){
   if(now<r.cd){stage='Betting';until=r.cd;}
   else if(now<r.ct){stage='Running';until=r.ct;}
   else{stage='Result';until=r.e;}
-  return {stage,left:Math.max(0,Math.ceil((until-now)/1000)),mines:r.m,totalTiles:T};
+  const left=Math.max(0,Math.ceil((until-now)/1000));
+  const untilEnd=Math.max(0,Math.ceil((r.e-now)/1000));
+  const bombTiles=r.mines.map((isMine,idx)=>isMine?(idx+1):null).filter(Boolean);
+  const safeSteps=r.bust?r.f:r.sc;
+
+  const d=new Date(now);
+  const dn=(d.getFullYear()%100)*10000+(d.getMonth()+1)*100+d.getDate();
+  const day=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+  const nextR=mkR(day,dn,r.i+1,r.e);
+  const nextBombTiles=nextR.mines.map((isMine,idx)=>isMine?(idx+1):null).filter(Boolean);
+  const nextSafeSteps=nextR.bust?nextR.f:nextR.sc;
+
+  return {
+    cur:{
+      id:r.id,
+      stage,
+      left,
+      untilEnd,
+      minesCount:r.m,
+      bombTiles:bombTiles,
+      totalTiles:T,
+      bust:r.bust,
+      bustStep:r.bust?(r.f+1):null,
+      safeSteps:safeSteps,
+      multiplier:r.x
+    },
+    next:{
+      id:nextR.id,
+      startsIn:untilEnd,
+      minesCount:nextR.m,
+      bombTiles:nextBombTiles,
+      totalTiles:T,
+      bust:nextR.bust,
+      bustStep:nextR.bust?(nextR.f+1):null,
+      safeSteps:nextSafeSteps,
+      multiplier:nextR.x
+    }
+  };
 }
 window.MinesPro={open,close,config:CFG,ladder,_x:closeSh,getLive,
 _a:i=>{const r=Math.floor(+$('apR').value),t=Math.floor(+$('apT').value);if(!(r>=1&&r<=500&&t>=1&&t<=21))return toast('Rounds 1–500, tiles 1–21');SL[i].ap={on:1,left:r,rounds:r,tiles:t};closeSh();toast('Auto Play agle round se shuru');ui()}};
