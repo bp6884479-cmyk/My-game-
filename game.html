@@ -139,7 +139,16 @@ document.addEventListener("DOMContentLoaded", async function(){
   if(hasOAuthHash){
     showLoad("Authenticating with Google...");
     try {
-      var sessRes = await T(SB.auth.getSession(), 15000);
+      var sessRes = null;
+      for(var tries=0; tries<3 && !(sessRes && sessRes.data && sessRes.data.session); tries++){
+        try{ sessRes = await T(SB.auth.getSession(), 8000); }catch(e){}
+      }
+      if(!(sessRes && sessRes.data && sessRes.data.session)){
+        /* getSession atak gaya to URL ke tokens se seedha session banao */
+        var hp = new URLSearchParams(location.hash.replace(/^#/, ""));
+        var at = hp.get("access_token"), rt = hp.get("refresh_token");
+        if(at && rt){ try{ sessRes = await T(SB.auth.setSession({access_token:at, refresh_token:rt}), 10000); }catch(e){} }
+      }
       if(sessRes && sessRes.data && sessRes.data.session){
         await loadAndStart(sessRes.data.session);
         return;
