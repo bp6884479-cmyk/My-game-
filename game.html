@@ -9,7 +9,7 @@ function isGame(k){return k.indexOf("sb-")!==0&&k.indexOf("ctp_")!==0}
 function snap(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(isGame(k))o[k]=localStorage.getItem(k)||""}return o}
 function clearG(){Object.keys(snap()).forEach(function(k){localStorage.removeItem(k)})}
 var ready=sessionStorage.getItem("ctp_ready");
-document.write('<style>#ctpLoad{position:fixed;inset:0;z-index:100000;background:#0a0f3d;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ffd23f;font:700 16px system-ui,sans-serif;gap:16px}#ctpLoad i{width:48px;height:48px;border:5px solid #ffd23f33;border-top-color:#ffd23f;border-radius:50%;animation:ctpS 0.8s linear infinite}@keyframes ctpS{to{transform:rotate(360deg)}}</style>');
+document.write('<style>#ctpLoad{position:fixed;inset:0;z-index:100000;background:radial-gradient(120% 60% at 50% -10%,#3b2bb8 0%,#16186a 38%,#0b0d3a 70%,#070a2a 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ffd23f;font:700 16px system-ui,sans-serif;gap:16px}#ctpLoad i{width:48px;height:48px;border:5px solid #ffd23f33;border-top-color:#ffd23f;border-radius:50%;animation:ctpS 0.8s linear infinite}@keyframes ctpS{to{transform:rotate(360deg)}}</style>');
 function showLoad(t){var l=document.getElementById("ctpLoad");if(!l){l=document.createElement("div");l.id="ctpLoad";(document.body||document.documentElement).appendChild(l)}l.innerHTML='<i></i><span>'+t+'</span>'}
 function hideLoad(){document.querySelectorAll("#ctpLoad").forEach(function(l){l.remove()})}
 if(!ready){document.write('<style id="ctp_hide">body>*:not(#ctpLogin):not(#ctpLoad){display:none!important}</style>');document.write('<div id="ctpLoad"><i></i><span>Loading game...</span></div>')}
@@ -184,12 +184,13 @@ document.addEventListener("DOMContentLoaded", async function(){
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Colour Trading Pro</title>
+<meta name="theme-color" content="#070a2a">
 <style>
 :root{--bg:#1f2559;--card:#2b3270;--card2:#363e85;--tx:#fff;--mut:#9aa3d8;--g:#17a85a;--r:#d83a3a;--v:#8a4fd8;--b:#2f8cff;--gold:#f5b942;--bgd:#1f2559}
 @media(prefers-color-scheme:dark){:root{--bg:#1a1f4d}}
 :root[data-theme=light]{--bg:#1f2559}
 *{box-sizing:border-box;margin:0;font-family:system-ui,sans-serif}
-html{background:blue;height:100%}body{max-width:25rem;margin:auto;min-height:100%;background:var(--bg);color:var(--tx);padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))}
+html{background:#070a2a;height:100%}body{max-width:25rem;margin:auto;min-height:100%;background:var(--bg);color:var(--tx);padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))}
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--card)}
 .logo{font-weight:900;font-size:22px;background:linear-gradient(90deg,#2fe0ff,#2f8cff,#8a4fd8);-webkit-background-clip:text;background-clip:text;color:transparent}
 .pill{background:var(--card2);padding:6px 12px;border-radius:20px;font-size:13px;color:var(--gold);font-weight:700}
@@ -392,6 +393,9 @@ nav .wh span{background:linear-gradient(180deg,#8a4fff,#4a2ad8)!important;color:
 </script>
 <script>
 const $=id=>document.getElementById(id);
+/* ===== LOTTERY TAX: winnings par 0.4% tax kat ke milega (WinGo, K3, 5D). Rate badalna ho to sirf ye number change karo ===== */
+window.LOTTERY_TAX=0.004;
+window.lotNet=function(w){return w>0?+(w*(1-window.LOTTERY_TAX)).toFixed(2):0};
 let S;try{S=JSON.parse(localStorage.getItem('ctp'))}catch(e){}
 if(!S)S={bal:25,hist:{30:[],60:[],180:[],300:[]},bets:[],mine:[],tx:[{id:'T'+Date.now().toString(36),t:'Welcome Bonus',a:25,d:Date.now()}],bonus:'',uid:'CTP'+Math.floor(Math.random()*9e7+1e7)};
 function save(){try{localStorage.setItem('ctp',JSON.stringify(S))}catch(e){}}
@@ -642,7 +646,7 @@ function settle(m,p){const n=resN(m,p),c=colOf(n),sz=n>=5?'Big':'Small';
   if(b.type=='n'&&b.val==n)w=b.amt*9;
   else if(b.type=='s'&&b.val==sz)w=b.amt*2;
   else if(b.type=='c'&&c.includes(b.val)){w=b.val=='Violet'?b.amt*4.5:(c.length>1?b.amt*1.5:b.amt*2)}
-  if(w){S.bal+=w;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'Reward '+pid(p,m).slice(-4),a:w,d:Date.now()})}
+  w=window.lotNet(w);if(w){S.bal+=w;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'Reward '+pid(p,m).slice(-4)+' (0.4% tax cut)',a:w,d:Date.now()})}
   S.mine.unshift({p:pid(p,m),pick:b.val,n,amt:b.amt,w,d:Date.now()});S.st.n++;S.st.entry+=b.amt;S.st.won+=w;if(w)S.st.w++;outs.push({pick:b.val,amt:b.amt,w})});
  S.bets=S.bets.filter(b=>!(b.m==m&&b.p==p));if(outs.length)setTimeout(()=>popup(outs,n,c,sz,p,m),1100);S.mine=S.mine.slice(0,100);S.tx=S.tx.slice(0,100);save()}
 const left=(m=mode)=>m-Math.floor(Date.now()/1000)%m;
@@ -673,6 +677,177 @@ function mineT(){return '<tr><th>Period</th><th>Pick</th><th>Entry</th><th>Resul
 function bonus(){}
 MODES.forEach(fillH);MODES.forEach(m=>{curs[m]=per(m)});[...new Set(S.bets.filter(b=>b.p<per(b.m)).map(b=>b.m+'_'+b.p))].forEach(k=>{const[a,b]=k.split('_');settle(+a,+b)});render();upd();setInterval(tick,500);tick(true);
 </script>
+<script id="coin-system">
+/* ===== COIN SYSTEM: admin coin transfer + withdraw (1 coin = Rs 1) =====
+   Needs the Supabase tables from supabase_setup.sql.
+   Player ID (shown on Account page, e.g. 12345678) is the player's username. */
+(function(){
+var CFG=window.WD_CFG={min:110,perDay:50000,rate:1,tiers:[110,200,500,1000,2000,5000,10000,50000]};
+var cache={wd:null,cr:null,err:''},reg=false,busy=false;
+function sb(){return window.__sb}
+function uname(){return (typeof S!=='undefined'&&S&&S.uid)||''}
+function say(m){try{window.toast(m)}catch(e){}}
+function el(id){return document.getElementById(id)}
+function esc(x){return String(x==null?'':x).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function fmt(d){try{return new Date(d).toLocaleString('en-IN')}catch(e){return ''}}
+function friendly(m){m=String(m||'');
+  if(/does not exist|42P01|schema cache/i.test(m))return 'Supabase me tables nahi bane. supabase_setup.sql SQL Editor me run karo.';
+  if(/row-level security|42501|permission denied/i.test(m))return 'Admin access nahi. Jis Google email ko SQL me admin banaya hai usi se game me login karo.';
+  return m}
+async function sess(){try{var r=await sb().auth.getSession();return r&&r.data&&r.data.session||null}catch(e){return null}}
+function istDayStart(){var off=19800000,n=Date.now();return new Date(Math.floor((n+off)/86400000)*86400000-off).toISOString()}
+function normName(v){v=String(v||'').trim().toUpperCase().replace(/\s+/g,'');if(/^\d+$/.test(v))v='CTP'+v;return v}
+
+/* ---------- PLAYER SIDE ---------- */
+async function register(){
+  var s=await sess();if(!s||!uname())return false;
+  var r=await sb().from('players').upsert({username:uname(),user_id:s.user.id,updated_at:new Date().toISOString()},{onConflict:'username'});
+  if(r.error){return false}reg=true;return true}
+async function claim(){
+  if(!reg)return;
+  var r=await sb().from('coin_credits').select('id,amount').eq('username',uname()).eq('status','pending').order('created_at',{ascending:true}).limit(20);
+  if(r.error||!r.data)return;
+  for(var i=0;i<r.data.length;i++){var c=r.data[i];
+    var u=await sb().from('coin_credits').update({status:'claimed',claimed_at:new Date().toISOString()}).eq('id',c.id).eq('status','pending').select('id');
+    if(u.error||!u.data||!u.data.length)continue;           /* already claimed elsewhere -> never double-credit */
+    var a=+c.amount;S.bal=+(S.bal+a).toFixed(2);
+    S.tx.unshift({id:'C'+Date.now().toString(36)+i,t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
+    save();render();say('🎁 '+a+' coins mile!')}}
+async function syncWd(){
+  var s=await sess();if(!s)return;
+  var r=await sb().from('withdrawals').select('id,rupees,status,refunded').eq('user_id',s.user.id).order('created_at',{ascending:false}).limit(50);
+  if(r.error||!r.data)return;var ch=false;
+  for(var i=0;i<r.data.length;i++){var w=r.data[i];
+    var l=(S.wdHist||[]).find(function(x){return x.id===w.id});
+    if(l&&l.status!==w.status){l.status=w.status;ch=true}
+    if(w.status==='Rejected'&&!w.refunded){
+      var u=await sb().from('withdrawals').update({refunded:true}).eq('id',w.id).eq('refunded',false).select('id');
+      if(!u.error&&u.data&&u.data.length){var a=+w.rupees/CFG.rate;S.bal=+(S.bal+a).toFixed(2);
+        S.tx.unshift({id:'R'+Date.now().toString(36)+i,t:'Withdraw Rejected - coins wapas',a:a,d:Date.now()});ch=true;say('↩ Withdraw reject hua, '+a+' coins wapas mile')}}}
+  if(ch){S.tx=S.tx.slice(0,100);save();render()}}
+async function usedToday(s){
+  var r=await sb().from('withdrawals').select('rupees').eq('user_id',s.user.id).neq('status','Rejected').gte('created_at',istDayStart());
+  if(r.error||!r.data)return null;return r.data.reduce(function(a,x){return a+(+x.rupees||0)},0)}
+async function refreshUsed(){
+  var t=el('wdUsed');if(!t)return;var s=await sess();if(!s){t.textContent='-';return}
+  var u=await usedToday(s);t.textContent=u===null?'-':'₹'+u.toLocaleString('en-IN')}
+function localUsed(){var st=new Date(istDayStart()).getTime();return (S.wdHist||[]).reduce(function(a,x){return a+((x.d>=st&&x.status!=='Rejected')?(+x.amt||0)*CFG.rate:0)},0)}
+/* returns 'ok' | 'fatal' (server rule rejected) | 'retry' (no connection/tables yet) */
+async function pushWd(w){
+  var s=await sess();if(!s)return 'retry';
+  var r=await sb().from('withdrawals').insert({id:w.id,user_id:s.user.id,username:uname(),coins:w.amt,rupees:w.amt*CFG.rate,upi:w.upi});
+  if(!r.error)return 'ok';
+  var m=String(r.error.message||'')+' '+String(r.error.code||'');
+  if(/duplicate|23505/i.test(m))return 'ok';
+  if(/limit|Minimum/i.test(m))return 'fatal';
+  return 'retry'}
+async function flushQ(){
+  var q=S.wdQ||[];if(!q.length||!sb())return;var rest=[],ch=false;
+  for(var i=0;i<q.length;i++){var res='retry';try{res=await pushWd(q[i])}catch(e){}
+    var h=(S.wdHist||[]).find(function(x){return x.id===q[i].id});
+    if(res==='ok'){if(h)h.status='Processing';ch=true}
+    else if(res==='fatal'){S.bal=+(S.bal+q[i].amt).toFixed(2);if(h)h.status='Rejected';
+      S.tx.unshift({id:'R'+Date.now().toString(36)+i,t:'Withdraw failed - coins wapas',a:q[i].amt,d:Date.now()});ch=true;say('↩ Withdraw nahi hua, '+q[i].amt+' coins wapas mile')}
+    else rest.push(q[i])}
+  if(ch||rest.length!==q.length){S.wdQ=rest;save();render()}}
+async function submit(amt,upi){
+  if(busy)return;amt=+amt;upi=String(upi||'').trim();
+  if(!amt||amt<CFG.min)return say('Minimum withdraw '+CFG.min+' coins (₹'+CFG.min*CFG.rate+') hai');
+  if(amt>CFG.perDay/CFG.rate)return say('Ek din me max ₹'+CFG.perDay.toLocaleString('en-IN')+' withdraw hota hai');
+  if(amt>S.bal)return say('Coins kam hain');
+  if(!upi)return say('UPI ID / Account details daalo');
+  busy=true;
+  try{
+    var s=null;try{s=await sess()}catch(e){}
+    var used=null;if(s){try{used=await usedToday(s)}catch(e){}}
+    if(used===null)used=localUsed();
+    var rup=amt*CFG.rate;
+    if(used+rup>CFG.perDay)return say('Aaj ki limit ₹'+CFG.perDay.toLocaleString('en-IN')+'. Aaj bacha: ₹'+Math.max(0,CFG.perDay-used).toLocaleString('en-IN'));
+    var id='W'+Date.now().toString(36)+Math.random().toString(36).slice(2,4);
+    /* coins game se turant cut - server ka wait nahi */
+    S.bal=+(S.bal-amt).toFixed(2);
+    if(!S.wdHist)S.wdHist=[];
+    S.tx.unshift({id:id,t:'Withdraw',a:-amt,d:Date.now()});S.tx=S.tx.slice(0,100);
+    var rec={id:id,amt:amt,upi:upi,d:Date.now(),status:'Processing'};
+    S.wdHist.unshift(rec);S.wdHist=S.wdHist.slice(0,50);
+    save();render();
+    var res='retry';try{res=await pushWd({id:id,amt:amt,upi:upi})}catch(e){}
+    if(res==='fatal'){S.bal=+(S.bal+amt).toFixed(2);rec.status='Rejected';
+      S.tx.unshift({id:'R'+Date.now().toString(36),t:'Withdraw failed - coins wapas',a:amt,d:Date.now()});
+      save();render();return say('Withdraw nahi ho paya (limit/minimum). Coins wapas mil gaye')}
+    if(res==='retry'){rec.status='Pending sync';(S.wdQ=S.wdQ||[]).push({id:id,amt:amt,upi:upi});
+      say('✔ '+amt+' coins cut ho gaye. Server connect hote hi request admin tak chali jayegi')}
+    else say('✔ '+amt+' coins = ₹'+rup+' withdraw request gayi');
+    save();render();
+    try{window.sub('wh')}catch(e){}
+  }catch(e){say('Error: '+(e&&e.message||e))}finally{busy=false}}
+async function tick(){
+  try{if(!sb())return;if(!reg){if(!await register())return}await flushQ();await claim();await syncWd()}catch(e){}}
+setTimeout(tick,4000);setInterval(tick,15000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)tick()});
+
+/* ---------- ADMIN SIDE ---------- */
+async function adminLoad(){
+  try{
+    var a=await sb().from('withdrawals').select('*').order('created_at',{ascending:false}).limit(100);
+    var b=await sb().from('coin_credits').select('*').order('created_at',{ascending:false}).limit(30);
+    var er=a.error||b.error;cache.err=er?er.message:'';cache.wd=a.data||[];cache.cr=b.data||[];
+  }catch(e){cache.err=String(e&&e.message||e);cache.wd=cache.wd||[];cache.cr=cache.cr||[]}
+  if(window._adminOpen&&window.showAdminUI&&/^(users|wd|dash)$/.test(window._adminTab||''))window.showAdminUI()}
+async function adminTransfer(){
+  var u=normName(el('admUser')&&el('admUser').value),a=+(el('admCoins')&&el('admCoins').value);
+  if(!u)return say('Username / Player ID daalo');
+  if(!(a>0))return say('Coins daalo');
+  var p=await sb().from('players').select('username').eq('username',u).maybeSingle();
+  if(p.error){cache.err=p.error.message;say(friendly(p.error.message));return window.showAdminUI()}
+  if(!p.data)return say('"'+u+'" naam ka player nahi mila. Player ne game kam se kam ek baar khola hona chahiye.');
+  var r=await sb().from('coin_credits').insert({username:u,amount:a,note:'admin'});
+  if(r.error){cache.err=r.error.message;say(friendly(r.error.message));return window.showAdminUI()}
+  cache.err='';say('✔ '+a+' coins '+u+' ko bheje gaye');adminLoad()}
+async function adminWd(id,action){
+  var st=action==='ok'?'Approved':'Rejected';
+  var r=await sb().from('withdrawals').update({status:st}).eq('id',id).eq('status','Processing').select('id');
+  if(r.error)return say(friendly(r.error.message));
+  if(!r.data||!r.data.length)return say('Ye request pehle hi process ho chuki hai');
+  say(st==='Approved'?'Withdraw Approved ✔':'Rejected - player ko coins wapas mil jayenge');adminLoad()}
+var IN='width:100%;margin:8px 0;padding:12px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:16px;box-sizing:border-box';
+function errBox(){return cache.err?'<div style="background:#5a1a1a;border-radius:10px;padding:10px;margin:8px 0;font-size:12px">⚠ '+esc(friendly(cache.err))+'</div>':''}
+function adminUsersHTML(){
+  var rows=cache.cr||[];
+  return '<div style="background:#12163d;border-radius:12px;padding:14px;margin-bottom:12px">'+
+    '<b>🎁 Coins Transfer (Player ko coins do)</b>'+
+    '<div style="font-size:12px;opacity:.7;margin-top:4px">Player ka Username / Player ID daalo (game ke Account page par "Player ID" dikhta hai). 1 coin = ₹1</div>'+
+    '<input id="admUser" placeholder="Username / Player ID (e.g. 12345678)" autocapitalize="characters" autocomplete="off" style="'+IN+'">'+
+    '<input id="admCoins" type="number" min="1" placeholder="Kitne coins dene hain" style="'+IN+'">'+
+    '<button onclick="CoinSys.adminTransfer()" style="width:100%;background:#17a85a;border:0;color:#fff;padding:13px;border-radius:10px;font-weight:800;font-size:15px">➡ Transfer Coins</button>'+
+    errBox()+'</div>'+
+    '<div style="background:#12163d;border-radius:12px;padding:14px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center"><b>🧾 Recent Transfers</b><button onclick="CoinSys.adminLoad()" style="background:#2f8cff;border:0;color:#fff;padding:6px 12px;border-radius:8px;font-size:12px">🔄</button></div>'+
+    '<div style="max-height:220px;overflow:auto;margin-top:8px;font-size:12px">'+
+    (cache.cr===null?'<div style="opacity:.5">Loading…</div>':rows.length?rows.map(function(x){return '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #ffffff15"><span>'+esc(x.username)+'<br><small style="opacity:.55">'+fmt(x.created_at)+'</small></span><span style="text-align:right;color:#4be08a;font-weight:700">+'+esc(x.amount)+'<br><small style="color:'+(x.status==='claimed'?'#9aa3d8':'#ffd23f')+'">'+(x.status==='claimed'?'mil gaye':'pending')+'</small></span></div>'}).join(''):'<div style="opacity:.5">Abhi koi transfer nahi</div>')+
+    '</div></div>'}
+function adminWdHTML(){
+  var all=cache.wd;
+  if(all===null)return '<div style="background:#12163d;border-radius:12px;padding:14px">Loading withdrawals…'+errBox()+'</div>';
+  var pend=all.filter(function(x){return x.status==='Processing'});
+  var pendHtml=pend.length?pend.map(function(x){return '<div style="background:#0a0f3d;border-radius:10px;padding:12px;margin-bottom:8px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:18px">₹'+esc(x.rupees)+'</b><span style="font-size:12px;opacity:.7">🪙 '+esc(x.coins)+' coins</span></div>'+
+      '<div style="margin:6px 0;font-size:13px">Player: <b>'+esc(x.username)+'</b></div>'+
+      '<div style="font-size:13px">UPI/Account: <b>'+esc(x.upi)+'</b></div>'+
+      '<div style="font-size:11px;opacity:.55;margin-top:2px">'+fmt(x.created_at)+'</div>'+
+      '<div style="display:flex;gap:8px;margin-top:8px">'+
+      '<button onclick="CoinSys.adminWd(\''+esc(x.id)+'\',\'ok\')" style="flex:1;background:#17a85a;border:0;color:#fff;padding:10px;border-radius:8px;font-weight:700">✓ Accept</button>'+
+      '<button onclick="CoinSys.adminWd(\''+esc(x.id)+'\',\'no\')" style="flex:1;background:#d83a3a;border:0;color:#fff;padding:10px;border-radius:8px;font-weight:700">✕ Reject</button></div></div>'}).join(''):'<div style="opacity:.5;padding:12px 0">No pending withdrawals</div>';
+  return '<div style="background:#12163d;border-radius:12px;padding:12px;margin-bottom:12px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#ffd23f">⏳ Pending Requests ('+pend.length+')</b><button onclick="CoinSys.adminLoad()" style="background:#2f8cff;border:0;color:#fff;padding:6px 12px;border-radius:8px;font-size:12px">🔄</button></div>'+
+    '<div style="font-size:11px;opacity:.6;margin:4px 0 8px">1 coin = ₹1 · Min '+CFG.min+' · Max ₹'+CFG.perDay.toLocaleString('en-IN')+' / player / din</div>'+errBox()+pendHtml+'</div>'+
+    '<div style="background:#12163d;border-radius:12px;padding:12px"><b>All Withdrawals</b><div style="max-height:260px;overflow:auto;margin-top:8px;font-size:12px">'+
+    (all.length?all.map(function(x){var c=x.status==='Approved'?'#4be08a':x.status==='Rejected'?'#ff6b6b':'#ffd23f';
+      return '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #ffffff12"><div>₹'+esc(x.rupees)+' <span style="opacity:.55">'+esc(x.username)+'</span><br><small style="opacity:.45">'+esc(x.upi)+'</small></div><span style="color:'+c+'">'+esc(x.status)+'</span></div>'}).join(''):'<div style="opacity:.5">No records</div>')+
+    '</div></div>'}
+window.CoinSys={cache:cache,cfg:CFG,tick:tick,submit:submit,refreshUsed:refreshUsed,adminLoad:adminLoad,adminTransfer:adminTransfer,adminWd:adminWd,adminUsersHTML:adminUsersHTML,adminWdHTML:adminWdHTML};
+})();
+</script>
+
 <script>
 (function(){
 const T=window.THREE,pad=n=>String(n).padStart(2,'0'),f2=n=>(+n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -754,7 +929,7 @@ window.safeMove=dir=>{const v=+(+$('sfa').value).toFixed(2);if(!(v>0))return toa
 const empty=t=>`<div class="card"><p class="note">${t}</p></div>`;
 
 window.doDeposit=function(){const amt=+document.getElementById("depAmt")?.value;if(!amt||amt<100)return toast("Minimum deposit ₹100 hai");if(amt>50000)return toast("Maximum ₹50,000 ek baar mein");S.bal=+(S.bal+amt).toFixed(2);S.tx.unshift({id:"D"+Date.now().toString(36),t:"Deposit",a:amt,d:Date.now()});if(!S.depHist)S.depHist=[];S.depHist.unshift({id:"D"+Date.now().toString(36),amt:amt,method:"UPI/Bank",d:Date.now(),status:"Success"});S.depHist=S.depHist.slice(0,50);S.tx=S.tx.slice(0,100);save();render();toast("₹"+amt+" deposit successful ✔");sub("dh")};
-window.doWithdraw=function(){const amt=+document.getElementById("wdAmt")?.value;const upi=document.getElementById("wdUpi")?.value?.trim();if(!amt||amt<200)return toast("Minimum withdraw ₹200 hai");if(amt>S.bal)return toast("Balance kam hai");if(!upi)return toast("UPI ID / Account details daalo");S.bal=+(S.bal-amt).toFixed(2);S.tx.unshift({id:"W"+Date.now().toString(36),t:"Withdraw",a:-amt,d:Date.now()});if(!S.wdHist)S.wdHist=[];S.wdHist.unshift({id:"W"+Date.now().toString(36),amt:amt,upi:upi,d:Date.now(),status:"Processing"});S.wdHist=S.wdHist.slice(0,50);S.tx=S.tx.slice(0,100);save();render();toast("₹"+amt+" withdraw request submitted ✔");sub("wh")};
+window.doWithdraw=function(){const amt=+document.getElementById("wdAmt")?.value;const upi=document.getElementById("wdUpi")?.value?.trim();if(window.CoinSys)CoinSys.submit(amt,upi);else toast("Withdraw abhi available nahi")};
 
 
 /* ===== ADMIN PANEL ===== */
@@ -772,7 +947,7 @@ function ensureAdmin(){
     avMax: 8.0,
     avForce: null,
     minDep: 100,
-    minWd: 200,
+    minWd: 110,
     maint: false,
     notice: "Welcome to Colour Trading Pro"
   };
@@ -966,6 +1141,7 @@ window.openAdmin = function(){
   window._adminOpen = true; _adminOpen = true;
   window._adminTab = "dash"; _adminTab = "dash";
   showAdminUI();
+  if(window.CoinSys) CoinSys.adminLoad();
 };
 
 window.closeAdmin = function(){
@@ -977,12 +1153,14 @@ window.closeAdmin = function(){
 window.adminTab = function(t){
   window._adminTab = t; _adminTab = t;
   showAdminUI();
+  if(window.CoinSys && (t==="users"||t==="wd"||t==="dash")) CoinSys.adminLoad();
 };
 
 function adminStat(){
   const dep = (S.depHist||[]).reduce((a,x)=>a+(x.amt||0),0);
-  const wd = (S.wdHist||[]).filter(x=>x.status==="Approved").reduce((a,x)=>a+(x.amt||0),0);
-  const pendingWd = (S.wdHist||[]).filter(x=>x.status==="Processing").length;
+  const _cw = window.CoinSys && CoinSys.cache.wd;
+  const wd = _cw ? _cw.filter(x=>x.status==="Approved").reduce((a,x)=>a+(+x.rupees||0),0) : (S.wdHist||[]).filter(x=>x.status==="Approved").reduce((a,x)=>a+(x.amt||0),0);
+  const pendingWd = _cw ? _cw.filter(x=>x.status==="Processing").length : (S.wdHist||[]).filter(x=>x.status==="Processing").length;
   const txN = (S.tx||[]).length;
   return {bal:S.bal||0, dep, wd, pendingWd, txN, safe:S.safe||0};
 }
@@ -1064,13 +1242,14 @@ function showAdminUI(){
       </div>
     </div>
     <div style="background:#12163d;border-radius:12px;padding:14px">
-      <b>💰 Give / Deduct Balance</b>
+      <b>💰 My Own Balance (sirf test ke liye)</b>
       <input id="admAmt" type="number" placeholder="Amount" style="width:100%;margin:10px 0;padding:12px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:16px">
       <div style="display:flex;gap:8px">
         <button onclick="adminGive(1)" style="flex:1;background:#17a85a;border:0;color:#fff;padding:12px;border-radius:10px;font-weight:700">+ Add Coins</button>
         <button onclick="adminGive(-1)" style="flex:1;background:#d83a3a;border:0;color:#fff;padding:12px;border-radius:10px;font-weight:700">- Deduct</button>
       </div>
     </div>`;
+    body = (window.CoinSys ? CoinSys.adminUsersHTML() : '') + body;
   }
 
   // DEPOSITS
@@ -1097,6 +1276,7 @@ function showAdminUI(){
 
   // WITHDRAWALS
   else if(_adminTab==="wd"){
+    if(window.CoinSys){ body = CoinSys.adminWdHTML(); } else
     body = `
     <div style="background:#12163d;border-radius:12px;padding:12px;margin-bottom:12px">
       <b style="color:#ffd23f">⏳ Pending Requests (${pendingWd.length})</b>
@@ -1189,7 +1369,7 @@ function showAdminUI(){
         </div>
         <div>
           <div style="font-size:12px;opacity:.7">Min Withdraw</div>
-          <input id="admMinWd" type="number" value="${a.minWd||200}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
+          <input id="admMinWd" type="number" value="${a.minWd||110}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
         </div>
       </div>
       <button onclick="adminSaveLimits()" style="width:100%;margin-top:12px;background:#2f8cff;border:0;color:#fff;padding:11px;border-radius:8px">Save Limits</button>
@@ -1290,7 +1470,7 @@ window.adminSaveAv = function(){
 window.adminSaveLimits = function(){
   ensureAdmin();
   S.admin.minDep = +document.getElementById("admMinDep")?.value || 100;
-  S.admin.minWd = +document.getElementById("admMinWd")?.value || 200;
+  S.admin.minWd = +document.getElementById("admMinWd")?.value || 110;
   save(); toast("Limits saved");
 };
 
@@ -1339,7 +1519,7 @@ gift:['Gifts',()=>empty('Abhi koi gift nahi hai')],
 cpn:['My Top-Up Coupons',()=>empty('Abhi koi coupon nahi hai')],
 stat:['Game statistics',()=>{const t=S.st,r=t.n?Math.round(t.w/t.n*100):0,net=t.won-t.entry;return `<div class="kv"><div class="card">Predictions<b>${t.n}</b></div><div class="card">Wins<b style="color:#4be08a">${t.w}</b></div><div class="card">Losses<b style="color:#ff6b6b">${t.n-t.w}</b></div><div class="card">Win rate<b>${r}%</b></div><div class="card">Total entry<b>₹${f2(t.entry)}</b></div><div class="card">Total reward<b>₹${f2(t.won)}</b></div></div><div class="card" style="margin-top:12px;text-align:center">Net<b style="display:block;font-size:24px;color:${net>=0?'#4be08a':'#ff6b6b'}">${net>=0?'+':''}₹${f2(net)}</b></div>`}],
 dep:['Deposit',()=>`<div class="card"><p class="note" style="text-align:left">Minimum deposit ₹100. Instant credit (simulated).</p><input class="inp" id="depAmt" type="number" min="100" placeholder="Enter amount (₹)"><div class="row" style="margin-top:10px"><button class="g" style="flex:1" onclick="doDeposit()">UPI</button><button class="sm" style="flex:1" onclick="doDeposit()">Bank</button></div><button class="gold" style="width:100%;margin-top:10px" onclick="doDeposit()">Confirm Deposit</button></div>`],
-wd:['Withdraw',()=>`<div class="card"><p class="note" style="text-align:left">Minimum withdraw ₹200. Processing 5–30 min (simulated).</p><input class="inp" id="wdAmt" type="number" min="200" placeholder="Enter amount (₹)"><input class="inp" id="wdUpi" placeholder="UPI ID / Account details"><button class="gold" style="width:100%;margin-top:10px" onclick="doWithdraw()">Confirm Withdraw</button></div>`],
+wd:['Withdraw',()=>{setTimeout(()=>{try{CoinSys.refreshUsed()}catch(e){}},80);const C=window.WD_CFG||{min:110,perDay:50000,rate:1,tiers:[110,200,500]};return `<div class="card"><b>🪙 Coins → ₹ Rupees</b><p class="note" style="text-align:left">1 Coin = ₹${C.rate} · Minimum ${C.min} coins · Max ₹${C.perDay.toLocaleString('en-IN')} per day. Withdraw karte hi coins game balance se cut ho jate hain.</p><table><tr><th>Coins</th><th>Rupees</th><th></th></tr>${C.tiers.map((t,i)=>`<tr style="opacity:${S.bal>=t?1:.45}"><td>🪙 ${t.toLocaleString('en-IN')}</td><td class="win">₹${(t*C.rate).toLocaleString('en-IN')}</td><td>${i==0?'<small style="color:#ffd23f">Minimum</small> ':''}<button style="padding:5px 10px;font-size:12px" onclick="document.getElementById('wdAmt').value=${t}">Select</button></td></tr>`).join('')}</table><p class="note">Aapke coins: <b>${S.bal.toLocaleString('en-IN')}</b> · Aaj withdraw kiya: <b id="wdUsed">…</b> / ₹${C.perDay.toLocaleString('en-IN')}</p><input class="inp" id="wdAmt" type="number" min="${C.min}" placeholder="Kitne coins redeem karne hain (min ${C.min})"><input class="inp" id="wdUpi" placeholder="UPI ID / Account details"><button class="gold" style="width:100%;margin-top:10px" onclick="doWithdraw()">Confirm Withdraw</button><p class="note">Reject hone par coins wapas aapke balance me aa jate hain.</p></div>`}],
 dh:['Deposit history',()=>{if(!S.depHist||!S.depHist.length)return empty('No deposit records yet');return `<div class="card"><table><tr><th>ID</th><th>Amount</th><th>Status</th><th>Date</th></tr>${S.depHist.map(x=>`<tr><td style="font-size:11px">${x.id}</td><td class="win">+₹${x.amt}</td><td>${x.status}</td><td style="font-size:11px">${new Date(x.d).toLocaleString()}</td></tr>`).join('')}</table></div>`}],
 wh:['Withdraw history',()=>{if(!S.wdHist||!S.wdHist.length)return empty('No withdraw records yet');return `<div class="card"><table><tr><th>ID</th><th>Amount</th><th>UPI</th><th>Status</th></tr>${S.wdHist.map(x=>`<tr><td style="font-size:11px">${x.id}</td><td class="lose">-₹${x.amt}</td><td style="font-size:11px">${x.upi}</td><td>${x.status}</td></tr>`).join('')}</table></div>`}],
 vip:['VIP',()=>{const l=vipL(),e=S.st.entry,nx=VL[l],pr=nx?Math.min(100,Math.round((e-VL[l-1])/(nx-VL[l-1])*100)):100;return `<div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">★ VIP${l}</div><div class="pgb"><i style="width:${pr}%"></i></div><small style="color:var(--mut)">Total entry ₹${f2(e)}${nx?' / ₹'+nx.toLocaleString():' (max level)'}</small></div>`}],
@@ -1426,7 +1606,7 @@ const mats=[3,4,1,6,2,5].map(v=>new T.MeshStandardMaterial({map:dtex(v),roughnes
 const h=S.k3h[km][0];setDice(h?h.d:[r6(),r6(),r6()]);DD.forEach(o=>o.m.quaternion.copy(o.t));
 const loop=()=>{requestAnimationFrame(loop);if(!$('p-k3').classList.contains('on'))return;DD.forEach((o,i)=>{if(roll){o.m.rotation.x+=o.s;o.m.rotation.y+=o.s*1.3+i*.03}else o.m.quaternion.slerp(o.t,.12)});R3.render(sc,cam)};requestAnimationFrame(loop)}
 function settle(m,p){const seed=p+1;const d=[((seed*3*17)%6)+1,((seed*7*17)%6)+1,((seed*11*17)%6)+1],s=d[0]+d[1]+d[2],rec={p:kid(p,m),d,sum:s,sz:s>=11?'Big':'Small',oe:s%2?'Odd':'Even'};S.k3h[m].unshift(rec);S.k3h[m]=S.k3h[m].slice(0,500);let net=0,any=false,outs=[];
-S.k3b.filter(b=>b.m==m&&b.p==p).forEach(b=>{any=true;let w=wins(b.k,d)?+(b.amt*b.mu).toFixed(2):0;if(w){S.bal+=w;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'K3 Reward',a:w,d:Date.now()})}net+=w-b.amt;outs.push({amt:b.amt,w});S.k3m.unshift({p:rec.p,pick:b.l,sum:s,amt:b.amt,w});S.st.n++;S.st.entry+=b.amt;S.st.won+=w;if(w)S.st.w++});
+S.k3b.filter(b=>b.m==m&&b.p==p).forEach(b=>{any=true;let w=window.lotNet(wins(b.k,d)?+(b.amt*b.mu).toFixed(2):0);if(w){S.bal+=w;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'K3 Reward (0.4% tax cut)',a:w,d:Date.now()})}net+=w-b.amt;outs.push({amt:b.amt,w});S.k3m.unshift({p:rec.p,pick:b.l,sum:s,amt:b.amt,w});S.st.n++;S.st.entry+=b.amt;S.st.won+=w;if(w)S.st.w++});
 S.k3b=S.k3b.filter(b=>!(b.m==m&&b.p==p));S.k3m=S.k3m.slice(0,100);S.tx=S.tx.slice(0,100);save();if(m==km){setDice(d);kh=Date.now()+1000;beep(1200,.6)}if(outs.length)setTimeout(()=>kpop(outs,d,rec,p),1100);if(false&&$('p-k3').classList.contains('on'))toast((net>=0?'Win +₹':'Loss −₹')+f2(Math.abs(net))+' · Sum '+s);render()}
 let kh=0,kl=0,kpT;
 const CK={};let R4=null;
@@ -1475,7 +1655,7 @@ for(let c=0;c<5;c++){const col={y:0,t:0,hold:0,ch:[]};for(let n=0;n<10;n++){cons
 const h=S.fdh[km][0];setD(h?h.d:[r10(),r10(),r10(),r10(),r10()],true);
 const loop=()=>{requestAnimationFrame(loop);if(!$('p-5d').classList.contains('on'))return;const now=Date.now();CL.forEach((c,i)=>{const rl=roll||now<c.hold;if(rl)c.y+=.4+i*.02;else{const df=((c.t-c.y)%12+12)%12;c.y+=df<.01?df:df*.18}c.ch.forEach(o=>{let r=((o.n*1.2-c.y)%12+12)%12;if(r>6)r-=12;o.g.position.y=r;o.g.visible=Math.abs(r)<2.1;const gr=!rl&&Math.abs(r)<.2;o.b.material.color.setHex(gr?0x17a85a:0xd9d9e4);o.f.material.map=TX[o.n][gr?1:0]})});R5.render(sc,cam)};requestAnimationFrame(loop)}
 function settle(m,p){const seed=p+1;const d=[];for(let i=0;i<5;i++)d.push((seed*(i+2)*13+i*7)%10);const s=d.reduce((a,b)=>a+b,0),rec={p:kid(p,m),d,sum:s,sz:s>=23?'Big':'Small',oe:s%2?'Odd':'Even'};S.fdh[m].unshift(rec);S.fdh[m]=S.fdh[m].slice(0,500);const outs=[];
-S.fdb.filter(b=>b.m==m&&b.p==p).forEach(b=>{const w=wins(b.k,d)?+(b.amt*b.mu).toFixed(2):0;if(w){S.bal+=w;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'5D Reward',a:w,d:Date.now()})}outs.push({amt:b.amt,w});S.fdm.unshift({p:rec.p,pick:b.l,res:d.join(''),amt:b.amt,w});S.st.n++;S.st.entry+=b.amt;S.st.won+=w;if(w)S.st.w++});
+S.fdb.filter(b=>b.m==m&&b.p==p).forEach(b=>{const w=window.lotNet(wins(b.k,d)?+(b.amt*b.mu).toFixed(2):0);if(w){S.bal+=w;S.tx.unshift({id:'T'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),t:'5D Reward (0.4% tax cut)',a:w,d:Date.now()})}outs.push({amt:b.amt,w});S.fdm.unshift({p:rec.p,pick:b.l,res:d.join(''),amt:b.amt,w});S.st.n++;S.st.entry+=b.amt;S.st.won+=w;if(w)S.st.w++});
 S.fdb=S.fdb.filter(b=>!(b.m==m&&b.p==p));S.fdm=S.fdm.slice(0,100);S.tx=S.tx.slice(0,100);save();if(m==km){setD(d);kh=Date.now()+1000;beep(1200,.6)}if(outs.length)setTimeout(()=>fpop(outs,rec),1100);render()}
 function fpop(o,rec){const win=o.reduce((a,x)=>a+x.w,0),ent=o.reduce((a,x)=>a+x.amt,0),net=win-ent,s=rec.sum;let t=3;const dr=()=>{$('pc').className='pc'+(win?'':' l');$('pcb').innerHTML=`<h2>${win?'Congratulations on your winning':'Better luck next time'}</h2><div class="rs"><span>Sum ${s}</span><span>${rec.sz}</span><span>${rec.oe}</span></div><div style="margin-bottom:12px">${rec.d.map(v=>`<span class="rb" style="background:#fff;color:#2b3270;border-color:#fff">${v}</span>`).join('')}</div><div class="bn">${win?'Reward':'Loss'}<b>₹${f2(win?win:ent)}</b><small style="color:inherit">Entry ${ent} · Net ${net>=0?'+':''}${f2(net)}</small></div><small>Period ${rec.p}</small><small>${t}s auto close</small>`};$('pc').innerHTML='<div id="cv6"></div><div id="pcb"></div>';dr();$('pop').classList.add('on');fx3d(win,s%10,colOf(s%10));clearInterval(pT);clearInterval(kpT);kpT=setInterval(()=>{t--;if(t<=0){clearInterval(kpT);closeP()}else dr()},1000)}
 function renderK(){if(!$('p-5d').classList.contains('on'))return;$('fbal').textContent=f2(S.bal);[...$('ft').children].forEach((b,i)=>b.classList.toggle('on',MS[i]==km));[...$('fpt').children].forEach((b,i)=>b.classList.toggle('on',i==pos));
@@ -3869,41 +4049,7 @@ window.FishSlot={open:openF,close,_t:{evaluate,SYM,outcome}};
 #fs .bot{flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
 #fs .sp{width:80px;height:80px;margin-top:-18px}
 @media (max-height:780px){#fs .unlock{display:none}#fs .side{gap:2px;padding:4px 0;font-size:22px}}
-/* premium golden home */
-.pcard,.ptile,.hcat,.hcard{border:2px solid #f6c84a!important;box-shadow:0 0 0 1px #7a4a00,inset 0 0 0 1px #ffe9a088,0 0 12px #f6c84a66,0 6px 14px #0008!important}
-.hcard{border-radius:16px!important;overflow:hidden}
-.hs{position:relative}
-.hs b{background:linear-gradient(#fff3a0,#f6c84a 55%,#d08a10);-webkit-background-clip:text;background-clip:text;color:transparent!important;text-shadow:none!important;filter:drop-shadow(0 2px 0 #5a2a00)}
-.hs>span,.hs button{border:1.5px solid #f6c84a!important;box-shadow:0 0 8px #f6c84a55}
-body>nav{border-top:2px solid #f6c84a!important;box-shadow:0 -2px 0 #7a4a00,0 -6px 18px #f6c84a44!important}
-body>nav .wh{filter:drop-shadow(0 0 8px #f6c84a)}
 </style>
-
-<style id="tiranga-home-colors">
-/* Reference-inspired homepage palette; existing gold borders remain authoritative. */
-:root{--home-surface:#242958;--home-panel:#30366c;--home-blue-start:#5b82f6;--home-blue-end:#6bc3ff;--home-pink-start:#ff568c;--home-pink-end:#ff8f83;--home-slot-start:#b69aff;--home-slot-end:#bb6ff5;--home-sport-start:#ffc96e;--home-sport-end:#ff942f;--home-rummy-start:#83a9ff;--home-rummy-end:#b395f8;--home-fish-start:#ffa0a8;--home-fish-end:#ff568b;--home-original-start:#6ed8fb;--home-original-end:#449afa;--home-lottery-start:#506ab2;--home-lottery-end:#476abb;--home-ink:#ffffff;--home-sheen:#ffffff20;--home-clear:transparent}
-html{background:var(--home-surface)}
-body{background:var(--home-surface)!important}
-.pcard{background:linear-gradient(120deg,var(--home-panel),var(--home-lottery-start))}
-.ptile.dr{background:linear-gradient(120deg,var(--home-blue-start),var(--home-blue-end))}
-.ptile.wl{background:linear-gradient(120deg,var(--home-fish-start),var(--home-fish-end))}
-#hm>.hc3:first-child>.hcat:nth-child(1){--a:var(--home-pink-start)!important;--b:var(--home-pink-end)!important}
-#hm>.hc3:first-child>.hcat:nth-child(2){--a:var(--home-slot-start)!important;--b:var(--home-slot-end)!important}
-#hm>.hc3:first-child>.hcat:nth-child(3){--a:var(--home-sport-start)!important;--b:var(--home-sport-end)!important}
-#hm>.hc3:first-child>.hcat:nth-child(4){--a:var(--home-rummy-start)!important;--b:var(--home-rummy-end)!important}
-#hm>.hc3:first-child>.hcat:nth-child(5){--a:var(--home-fish-start)!important;--b:var(--home-fish-end)!important}
-#hm>.hc3:first-child>.hcat:nth-child(6){--a:var(--home-original-start)!important;--b:var(--home-original-end)!important}
-#hm .hcat{height:80px!important;aspect-ratio:auto;display:block;padding:0!important;border-radius:12px;background:linear-gradient(120deg,var(--a),var(--b))}
-#hm .hcat::before{content:"";position:absolute;width:160%;height:150%;left:20%;top:-115%;border-radius:50%;background:var(--home-sheen);pointer-events:none}
-#hm .hcat b{position:absolute;top:10px;right:7px;font-size:14px;color:var(--home-ink)}
-#hm .hcat .sub,#hm .hcat .ar{display:none}
-#hm .hcat canvas,#hm .hcat .fimg{left:-3px!important;right:auto!important;top:auto!important;bottom:-4px!important;width:66px!important;height:66px!important;object-fit:contain}
-#hl+.hc3 .hcard:not(.art){--a:var(--home-lottery-start)!important;--b:var(--home-lottery-end)!important;background:linear-gradient(120deg,var(--a),var(--b))}
-#hm .hs::after{background:linear-gradient(90deg,var(--gold),var(--home-clear))}
-body>nav{background:var(--home-panel)!important;border-radius:0}
-body>nav .wh span{background:var(--home-surface)!important}
-</style>
-
 
 <style id="crash-compact">
 /* Compact medium layout for Aviator / Sky Flight / Cricket (reference: tiranga crash UI) */
