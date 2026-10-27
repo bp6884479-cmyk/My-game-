@@ -56,7 +56,7 @@ d.innerHTML='<style>#ctpLogin .w{position:fixed;inset:0;z-index:99999;background
 '<div class="ft"><div><i>🛡️</i>Safe &amp; Secure</div><div><i>⚡</i>Fast Gameplay</div><div><i>📊</i>Real Strategy</div><div><i>🏆</i>Be the Best</div></div><p id="ctpErr"></p></div><div class="gl">— GOOD LUCK! —</div></div>';
 document.body.appendChild(d);try{logo3d()}catch(e){}
 document.getElementById("ctpGo").onclick=async function(){msg("...");try{wipe();clearG();var r=await SB.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.href.split("#")[0],queryParams:{prompt:"select_account"}}});if(r.error)msg(r.error.message||"Google login fail")}catch(e){msg(String(e&&e.message||e))}};
-// Guest login removed: Google Login only}
+}
 
 function logo3d(){
 var host=document.getElementById("ctpLogo3d");if(!host)return;
@@ -132,7 +132,7 @@ if(fr%2===0){drawText(front.x,"front",(t*.45)%1.6-.3);front.t.needsUpdate=true}
 R.render(sc,cam)}
 loop();
 }
-window.ctpLogout=async function(){showLoad("Logging out...");try{await Promise.race([save(),new Promise(function(r){setTimeout(r,1000)})])}catch(e){}clearG();sessionStorage.removeItem("ctp_ready");wipe();setTimeout(function(){location.replace("./")},50)};
+window.ctpLogout=async function(){showLoad("Logging out...");try{await Promise.race([save(),new Promise(function(r){setTimeout(r,800)})])}catch(e){}try{await SB.auth.signOut()}catch(e){}try{localStorage.clear()}catch(e){}try{sessionStorage.clear()}catch(e){}location.replace("./?logout="+Date.now())};
 document.addEventListener("DOMContentLoaded", async function(){
   // Check if returning from Google OAuth (URL hash contains tokens)
   var hasOAuthHash = location.hash && (location.hash.indexOf("access_token=") > -1 || location.hash.indexOf("refresh_token=") > -1);
