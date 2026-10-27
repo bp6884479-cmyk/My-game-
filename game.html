@@ -692,7 +692,7 @@ function esc(x){return String(x==null?'':x).replace(/[&<>"']/g,function(c){retur
 function fmt(d){try{return new Date(d).toLocaleString('en-IN')}catch(e){return ''}}
 function friendly(m){m=String(m||'');
   if(/does not exist|42P01|schema cache/i.test(m))return 'Supabase me tables nahi bane. supabase_setup.sql SQL Editor me run karo.';
-  if(/row-level security|42501|permission denied/i.test(m))return 'Admin access nahi. Jis Google email ko SQL me admin banaya hai usi se game me login karo.';
+  if(/row-level security|42501|permission denied/i.test(m))return 'Admin access nahi. ['+m+']';
   return m}
 async function sess(){try{var r=await sb().auth.getSession();return r&&r.data&&r.data.session||null}catch(e){return null}}
 function istDayStart(){var off=19800000,n=Date.now();return new Date(Math.floor((n+off)/86400000)*86400000-off).toISOString()}
