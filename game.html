@@ -1134,10 +1134,17 @@ function buildPreviewHTML(){
   return html;
 }
 
-window.openAdmin = function(){
+window.openAdmin = async function(){
   ensureAdmin();
   const pass = prompt("Admin Password:");
   if(pass !== ADMIN_PASS){ toast("Galat password"); return; }
+  /* sirf ek Google account se admin khule */
+  var ADMIN_EMAIL = "bishalutujt@gmail.com", em = "";
+  try{ var r = await window.__sb.auth.getSession(); em = (r && r.data && r.data.session && r.data.session.user && r.data.session.user.email) || ""; }catch(e){}
+  if(em.toLowerCase() !== ADMIN_EMAIL){
+    alert("Admin sirf " + ADMIN_EMAIL + " se khulega.\nAbhi login: " + (em || "Guest (email nahi)") + "\n\nLog out karke Google se " + ADMIN_EMAIL + " chuno.");
+    return;
+  }
   window._adminOpen = true; _adminOpen = true;
   window._adminTab = "dash"; _adminTab = "dash";
   showAdminUI();
