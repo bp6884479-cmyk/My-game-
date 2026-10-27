@@ -702,7 +702,7 @@ function normName(v){v=String(v||'').trim().toUpperCase().replace(/\s+/g,'');if(
 async function register(){
   var s=await sess();if(!s||!uname())return false;
   var r=await sb().from('players').upsert({username:uname(),user_id:s.user.id,updated_at:new Date().toISOString()},{onConflict:'username'});
-  if(r.error){return false}reg=true;return true}
+  if(r.error){cache.regErr=r.error.message;return false}reg=true;return true}
 async function claim(){
   if(!reg)return;
   var r=await sb().from('coin_credits').select('id,amount').eq('username',uname()).eq('status','pending').order('created_at',{ascending:true}).limit(20);
@@ -713,6 +713,18 @@ async function claim(){
     var a=+c.amount;S.bal=+(S.bal+a).toFixed(2);
     S.tx.unshift({id:'C'+Date.now().toString(36)+i,t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
     save();render();say('🎁 '+a+' coins mile!')}}
+async function claimNow(){
+  try{
+    if(!sb())return say('Server connect nahi hua, thodi der baad try karo');
+    var s=await sess();if(!s)return say('Login nahi hai. Google se login karo');
+    if(!reg&&!await register())return say('Player register nahi hua: '+friendly(cache.regErr||'unknown'));
+    var r=await sb().from('coin_credits').select('id,amount').eq('username',uname()).eq('status','pending');
+    if(r.error)return say('Error: '+friendly(r.error.message));
+    if(!r.data||!r.data.length)return say('Abhi koi pending coins nahi hain');
+    var before=S.bal;await claim();
+    var got=+(S.bal-before).toFixed(2);
+    if(got>0)say('🎁 '+got+' coins mil gaye!');else say('Claim nahi hua, dobara try karo');
+  }catch(e){say('Error: '+(e&&e.message||e))}}
 async function syncWd(){
   var s=await sess();if(!s)return;
   var r=await sb().from('withdrawals').select('id,rupees,status,refunded').eq('user_id',s.user.id).order('created_at',{ascending:false}).limit(50);
@@ -782,8 +794,8 @@ async function submit(amt,upi){
     try{window.sub('wh')}catch(e){}
   }catch(e){say('Error: '+(e&&e.message||e))}finally{busy=false}}
 async function tick(){
-  try{if(!sb())return;if(!reg){if(!await register())return}await flushQ();await claim();await syncWd()}catch(e){}}
-setTimeout(tick,4000);setInterval(tick,15000);
+  try{if(!sb())return;if(!reg){if(!await register()){if(!tick.w){tick.w=1;say('Coins sync nahi ho raha: '+friendly(cache.regErr||'login/server check karo'))}return}}await flushQ();await claim();await syncWd()}catch(e){}}
+setTimeout(tick,1500);setInterval(tick,5000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)tick()});
 
 /* ---------- ADMIN SIDE ---------- */
@@ -844,7 +856,7 @@ function adminWdHTML(){
     (all.length?all.map(function(x){var c=x.status==='Approved'?'#4be08a':x.status==='Rejected'?'#ff6b6b':'#ffd23f';
       return '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #ffffff12"><div>₹'+esc(x.rupees)+' <span style="opacity:.55">'+esc(x.username)+'</span><br><small style="opacity:.45">'+esc(x.upi)+'</small></div><span style="color:'+c+'">'+esc(x.status)+'</span></div>'}).join(''):'<div style="opacity:.5">No records</div>')+
     '</div></div>'}
-window.CoinSys={cache:cache,cfg:CFG,tick:tick,submit:submit,refreshUsed:refreshUsed,adminLoad:adminLoad,adminTransfer:adminTransfer,adminWd:adminWd,adminUsersHTML:adminUsersHTML,adminWdHTML:adminWdHTML};
+window.CoinSys={cache:cache,cfg:CFG,tick:tick,submit:submit,refreshUsed:refreshUsed,adminLoad:adminLoad,adminTransfer:adminTransfer,adminWd:adminWd,adminUsersHTML:adminUsersHTML,adminWdHTML:adminWdHTML,claimNow:claimNow};
 })();
 </script>
 
@@ -1136,15 +1148,12 @@ function buildPreviewHTML(){
 
 window.openAdmin = async function(){
   ensureAdmin();
-  const pass = prompt("Admin Password:");
-  if(pass !== ADMIN_PASS){ toast("Galat password"); return; }
-  /* sirf ek Google account se admin khule */
+  /* Pehle email check (chupke se): admin account nahi hai to kuch bhi nahi dikhega, password bhi nahi poochega */
   var ADMIN_EMAIL = "bishalutujt@gmail.com", em = "";
   try{ var r = await window.__sb.auth.getSession(); em = (r && r.data && r.data.session && r.data.session.user && r.data.session.user.email) || ""; }catch(e){}
-  if(em.toLowerCase() !== ADMIN_EMAIL){
-    alert("Admin sirf " + ADMIN_EMAIL + " se khulega.\nAbhi login: " + (em || "Guest (email nahi)") + "\n\nLog out karke Google se " + ADMIN_EMAIL + " chuno.");
-    return;
-  }
+  if(em.toLowerCase() !== ADMIN_EMAIL) return;
+  const pass = prompt("Admin Password:");
+  if(pass !== ADMIN_PASS){ toast("Galat password"); return; }
   window._adminOpen = true; _adminOpen = true;
   window._adminTab = "dash"; _adminTab = "dash";
   showAdminUI();
