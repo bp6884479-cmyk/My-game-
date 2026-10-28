@@ -427,8 +427,8 @@ window.LOTTERY_TAX=0.004;
 window.lotNet=function(w){return w>0?+(w*(1-window.LOTTERY_TAX)).toFixed(2):0};
 let S;try{S=JSON.parse(localStorage.getItem('ctp'))}catch(e){}
 if(!S)S={bal:0,hist:{30:[],60:[],180:[],300:[]},bets:[],mine:[],tx:[],bonus:'',uid:'CTP'+Math.floor(Math.random()*9e7+1e7)};
-S.bal=0; /* balance hamesha server ke wallets table se aata hai, localStorage se nahi */
-function save(){try{var c={};for(var k in S)c[k]=S[k];c.bal=0;localStorage.setItem('ctp',JSON.stringify(c))}catch(e){}}
+S.bal=+S.bal||0;
+function save(){try{var c={};for(var k in S)c[k]=S[k];c.bal=+S.bal||0;localStorage.setItem('ctp',JSON.stringify(c))}catch(e){}}
 S.g50k=1;
 if(!S.bets)S.bets=[];if(!S.st)S.st={n:0,w:0,entry:0,won:0};if(!S.hist)S.hist={};[30,60,180,300].forEach(m=>{if(!S.hist[m])S.hist[m]=[]});
 let mode=30,sel=null,base=1,mul=1,curs={30:0,60:0,180:0,300:0},tabN=1;
@@ -739,9 +739,13 @@ function normName(v){v=String(v||'').trim().toUpperCase().replace(/\s+/g,'');if(
 async function syncWallet(){
   var s=await sess();if(!s)return;
   var r=await sb().from('wallets').select('balance').eq('user_id',s.user.id).maybeSingle();
-  if(r.error)return;
+  if(r.error){ console.warn('Wallet fetch error:', r.error); return; }
   var b=r.data?+r.data.balance||0:0;
-  if(typeof S!=='undefined'&&S&&S.bal!==b){S.bal=b;try{window.render()}catch(e){}}}
+  if(typeof S!=='undefined'&&S){
+    if(S.bal!==b){ S.bal=b; save(); try{window.render()}catch(e){} }
+    try{if(window._adminOpen&&typeof window.showAdminUI==='function') window.showAdminUI();}catch(e){}
+  }
+}
 function watchWallet(){
   try{
     if(walCh)return;
@@ -764,7 +768,9 @@ async function claim(){
   var r=await sb().rpc('claim_coins');
   if(r.error)return;
   var a=+r.data||0;
-  if(a>0){S.tx.unshift({id:'C'+Date.now().toString(36),t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
+  if(a>0){
+    if(typeof S!=='undefined'&&S){ S.bal=(+S.bal||0)+a; save(); try{window.render()}catch(e){} }
+    S.tx.unshift({id:'C'+Date.now().toString(36),t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
     await syncWallet();say('🎁 '+a+' coins mile!')}}
 async function claimNow(){
   try{
@@ -774,7 +780,9 @@ async function claimNow(){
     var r=await sb().rpc('claim_coins');
     if(r.error)return say('Error: '+friendly(r.error.message));
     var a=+r.data||0;
-    if(a>0){S.tx.unshift({id:'C'+Date.now().toString(36),t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
+    if(a>0){
+      if(typeof S!=='undefined'&&S){ S.bal=(+S.bal||0)+a; save(); try{window.render()}catch(e){} }
+      S.tx.unshift({id:'C'+Date.now().toString(36),t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
       await syncWallet();say('🎁 '+a+' coins mil gaye!')}
     else say('Abhi koi pending coins nahi hain');
   }catch(e){say('Error: '+(e&&e.message||e))}}
