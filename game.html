@@ -361,7 +361,7 @@ nav .wh span{background:linear-gradient(180deg,#8a4fff,#4a2ad8)!important;color:
 
 <section class="pg" id="p-wallet"><div class="sbh"><button class="bk" onclick="show('acc')">‹</button><b>Wallet</b><span style="width:36px"></span></div><div class="card bal"><small>Available balance</small><b id="b3">0</b></div>
  <h3 style="margin:10px 0">Transactions</h3><div class="card" style="padding:0;overflow:auto"><table id="tx"></table></div>
- <p class="note">Deposit & Withdraw available · Processing 5–30 min</p></section>
+ <p class="note">Withdraw available · Processing 5–30 min</p></section>
 
 <section class="pg" id="p-acc">
  <div class="ach"><canvas class="av" data-i="avatar" width="128" height="128"></canvas>
@@ -407,8 +407,9 @@ const $=id=>document.getElementById(id);
 window.LOTTERY_TAX=0.004;
 window.lotNet=function(w){return w>0?+(w*(1-window.LOTTERY_TAX)).toFixed(2):0};
 let S;try{S=JSON.parse(localStorage.getItem('ctp'))}catch(e){}
-if(!S)S={bal:25,hist:{30:[],60:[],180:[],300:[]},bets:[],mine:[],tx:[{id:'T'+Date.now().toString(36),t:'Welcome Bonus',a:25,d:Date.now()}],bonus:'',uid:'CTP'+Math.floor(Math.random()*9e7+1e7)};
-function save(){try{localStorage.setItem('ctp',JSON.stringify(S))}catch(e){}}
+if(!S)S={bal:0,hist:{30:[],60:[],180:[],300:[]},bets:[],mine:[],tx:[],bonus:'',uid:'CTP'+Math.floor(Math.random()*9e7+1e7)};
+S.bal=0; /* balance hamesha server ke wallets table se aata hai, localStorage se nahi */
+function save(){try{var c={};for(var k in S)c[k]=S[k];c.bal=0;localStorage.setItem('ctp',JSON.stringify(c))}catch(e){}}
 S.g50k=1;
 if(!S.bets)S.bets=[];if(!S.st)S.st={n:0,w:0,entry:0,won:0};if(!S.hist)S.hist={};[30,60,180,300].forEach(m=>{if(!S.hist[m])S.hist[m]=[]});
 let mode=30,sel=null,base=1,mul=1,curs={30:0,60:0,180:0,300:0},tabN=1;
@@ -688,12 +689,12 @@ function bonus(){}
 MODES.forEach(fillH);MODES.forEach(m=>{curs[m]=per(m)});[...new Set(S.bets.filter(b=>b.p<per(b.m)).map(b=>b.m+'_'+b.p))].forEach(k=>{const[a,b]=k.split('_');settle(+a,+b)});render();upd();setInterval(tick,500);tick(true);
 </script>
 <script id="coin-system">
-/* ===== COIN SYSTEM: admin coin transfer + withdraw (1 coin = Rs 1) =====
-   Needs the Supabase tables from supabase_setup.sql.
-   Player ID (shown on Account page, e.g. 12345678) is the player's username. */
+/* ===== COIN SYSTEM (SECURE): saare paise wale kaam server-side RPCs se hote hain.
+   Client kabhi bhi wallet/coin_credits/withdrawals me direct write NAHI karta.
+   Balance hamesha wallets table se read hota hai (realtime). */
 (function(){
 var CFG=window.WD_CFG={min:110,perDay:50000,rate:1,tiers:[110,200,500,1000,2000,5000,10000,50000]};
-var cache={wd:null,cr:null,err:''},reg=false,busy=false;
+var cache={wd:null,cr:null,err:''},reg=false,busy=false,walCh=null;
 function sb(){return window.__sb}
 function uname(){return (typeof S!=='undefined'&&S&&S.uid)||''}
 function say(m){try{window.toast(m)}catch(e){}}
@@ -701,39 +702,62 @@ function el(id){return document.getElementById(id)}
 function esc(x){return String(x==null?'':x).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function fmt(d){try{return new Date(d).toLocaleString('en-IN')}catch(e){return ''}}
 function friendly(m){m=String(m||'');
-  if(/does not exist|42P01|schema cache/i.test(m))return 'Supabase me tables nahi bane. supabase_setup.sql SQL Editor me run karo.';
-  if(/row-level security|42501|permission denied/i.test(m))return 'Admin access nahi. ['+m+']';
+  if(/NOT_ADMIN/i.test(m))return 'Ye account admin nahi hai';
+  if(/NOT_LOGGED_IN/i.test(m))return 'Login nahi hai. Google se login karo';
+  if(/MIN_WITHDRAW/i.test(m))return 'Minimum withdraw '+CFG.min+' coins hai';
+  if(/MAX_WITHDRAW|DAILY_LIMIT/i.test(m))return 'Aaj ki withdraw limit ₹'+CFG.perDay.toLocaleString('en-IN')+' hai';
+  if(/BAD_UPI/i.test(m))return 'UPI ID sahi format me daalo (e.g. naam@upi)';
+  if(/INSUFFICIENT_BALANCE/i.test(m))return 'Coins kam hain';
+  if(/BAD_USERNAME|username/i.test(m)&&/invalid|pattern/i.test(m))return 'Player ID sahi nahi hai';
+  if(/does not exist|42P01|schema cache/i.test(m))return 'Server setup adhoora hai. Admin se sampark karo.';
+  if(/row-level security|42501|permission denied/i.test(m))return 'Access nahi hai. ['+m+']';
   return m}
 async function sess(){try{var r=await sb().auth.getSession();return r&&r.data&&r.data.session||null}catch(e){return null}}
 function istDayStart(){var off=19800000,n=Date.now();return new Date(Math.floor((n+off)/86400000)*86400000-off).toISOString()}
 function normName(v){v=String(v||'').trim().toUpperCase().replace(/\s+/g,'');if(/^\d+$/.test(v))v='CTP'+v;return v}
 
+/* ---------- WALLET: balance hamesha server se ---------- */
+async function syncWallet(){
+  var s=await sess();if(!s)return;
+  var r=await sb().from('wallets').select('balance').eq('user_id',s.user.id).maybeSingle();
+  if(r.error)return;
+  var b=r.data?+r.data.balance||0:0;
+  if(typeof S!=='undefined'&&S&&S.bal!==b){S.bal=b;try{window.render()}catch(e){}}}
+function watchWallet(){
+  try{
+    if(walCh)return;
+    sess().then(function(s){
+      if(!s||walCh)return;
+      walCh=sb().channel('wal-'+s.user.id)
+        .on('postgres_changes',{event:'*',schema:'public',table:'wallets',filter:'user_id=eq.'+s.user.id},function(p){
+          var b=p.new&&p.new.balance;if(b!=null&&typeof S!=='undefined'&&S){S.bal=+b||0;try{window.render()}catch(e){}}})
+        .subscribe();
+    });
+  }catch(e){}}
+
 /* ---------- PLAYER SIDE ---------- */
 async function register(){
   var s=await sess();if(!s||!uname())return false;
-  var r=await sb().from('players').upsert({username:uname(),user_id:s.user.id,updated_at:new Date().toISOString()},{onConflict:'username'});
+  var r=await sb().rpc('register_player',{p_username:uname()});
   if(r.error){cache.regErr=r.error.message;return false}reg=true;return true}
 async function claim(){
   if(!reg)return;
-  var r=await sb().from('coin_credits').select('id,amount').eq('username',uname()).eq('status','pending').order('created_at',{ascending:true}).limit(20);
-  if(r.error||!r.data)return;
-  for(var i=0;i<r.data.length;i++){var c=r.data[i];
-    var u=await sb().from('coin_credits').update({status:'claimed',claimed_at:new Date().toISOString()}).eq('id',c.id).eq('status','pending').select('id');
-    if(u.error||!u.data||!u.data.length)continue;           /* already claimed elsewhere -> never double-credit */
-    var a=+c.amount;S.bal=+(S.bal+a).toFixed(2);
-    S.tx.unshift({id:'C'+Date.now().toString(36)+i,t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
-    save();render();say('🎁 '+a+' coins mile!')}}
+  var r=await sb().rpc('claim_coins');
+  if(r.error)return;
+  var a=+r.data||0;
+  if(a>0){S.tx.unshift({id:'C'+Date.now().toString(36),t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
+    await syncWallet();say('🎁 '+a+' coins mile!')}}
 async function claimNow(){
   try{
     if(!sb())return say('Server connect nahi hua, thodi der baad try karo');
     var s=await sess();if(!s)return say('Login nahi hai. Google se login karo');
     if(!reg&&!await register())return say('Player register nahi hua: '+friendly(cache.regErr||'unknown'));
-    var r=await sb().from('coin_credits').select('id,amount').eq('username',uname()).eq('status','pending');
+    var r=await sb().rpc('claim_coins');
     if(r.error)return say('Error: '+friendly(r.error.message));
-    if(!r.data||!r.data.length)return say('Abhi koi pending coins nahi hain');
-    var before=S.bal;await claim();
-    var got=+(S.bal-before).toFixed(2);
-    if(got>0)say('🎁 '+got+' coins mil gaye!');else say('Claim nahi hua, dobara try karo');
+    var a=+r.data||0;
+    if(a>0){S.tx.unshift({id:'C'+Date.now().toString(36),t:'Admin Coins',a:a,d:Date.now()});S.tx=S.tx.slice(0,100);
+      await syncWallet();say('🎁 '+a+' coins mil gaye!')}
+    else say('Abhi koi pending coins nahi hain');
   }catch(e){say('Error: '+(e&&e.message||e))}}
 async function syncWd(){
   var s=await sess();if(!s)return;
@@ -741,37 +765,15 @@ async function syncWd(){
   if(r.error||!r.data)return;var ch=false;
   for(var i=0;i<r.data.length;i++){var w=r.data[i];
     var l=(S.wdHist||[]).find(function(x){return x.id===w.id});
-    if(l&&l.status!==w.status){l.status=w.status;ch=true}
-    if(w.status==='Rejected'&&!w.refunded){
-      var u=await sb().from('withdrawals').update({refunded:true}).eq('id',w.id).eq('refunded',false).select('id');
-      if(!u.error&&u.data&&u.data.length){var a=+w.rupees/CFG.rate;S.bal=+(S.bal+a).toFixed(2);
-        S.tx.unshift({id:'R'+Date.now().toString(36)+i,t:'Withdraw Rejected - coins wapas',a:a,d:Date.now()});ch=true;say('↩ Withdraw reject hua, '+a+' coins wapas mile')}}}
-  if(ch){S.tx=S.tx.slice(0,100);save();render()}}
+    if(l&&l.status!==w.status){l.status=w.status;ch=true;
+      if(w.status==='Rejected')say('↩ Withdraw reject hua, coins wapas mil gaye')}}
+  if(ch){save();render()}}
 async function usedToday(s){
   var r=await sb().from('withdrawals').select('rupees').eq('user_id',s.user.id).neq('status','Rejected').gte('created_at',istDayStart());
   if(r.error||!r.data)return null;return r.data.reduce(function(a,x){return a+(+x.rupees||0)},0)}
 async function refreshUsed(){
   var t=el('wdUsed');if(!t)return;var s=await sess();if(!s){t.textContent='-';return}
   var u=await usedToday(s);t.textContent=u===null?'-':'₹'+u.toLocaleString('en-IN')}
-function localUsed(){var st=new Date(istDayStart()).getTime();return (S.wdHist||[]).reduce(function(a,x){return a+((x.d>=st&&x.status!=='Rejected')?(+x.amt||0)*CFG.rate:0)},0)}
-/* returns 'ok' | 'fatal' (server rule rejected) | 'retry' (no connection/tables yet) */
-async function pushWd(w){
-  var s=await sess();if(!s)return 'retry';
-  var r=await sb().from('withdrawals').insert({id:w.id,user_id:s.user.id,username:uname(),coins:w.amt,rupees:w.amt*CFG.rate,upi:w.upi});
-  if(!r.error)return 'ok';
-  var m=String(r.error.message||'')+' '+String(r.error.code||'');
-  if(/duplicate|23505/i.test(m))return 'ok';
-  if(/limit|Minimum/i.test(m))return 'fatal';
-  return 'retry'}
-async function flushQ(){
-  var q=S.wdQ||[];if(!q.length||!sb())return;var rest=[],ch=false;
-  for(var i=0;i<q.length;i++){var res='retry';try{res=await pushWd(q[i])}catch(e){}
-    var h=(S.wdHist||[]).find(function(x){return x.id===q[i].id});
-    if(res==='ok'){if(h)h.status='Processing';ch=true}
-    else if(res==='fatal'){S.bal=+(S.bal+q[i].amt).toFixed(2);if(h)h.status='Rejected';
-      S.tx.unshift({id:'R'+Date.now().toString(36)+i,t:'Withdraw failed - coins wapas',a:q[i].amt,d:Date.now()});ch=true;say('↩ Withdraw nahi hua, '+q[i].amt+' coins wapas mile')}
-    else rest.push(q[i])}
-  if(ch||rest.length!==q.length){S.wdQ=rest;save();render()}}
 async function submit(amt,upi){
   if(busy)return;amt=+amt;upi=String(upi||'').trim();
   if(!amt||amt<CFG.min)return say('Minimum withdraw '+CFG.min+' coins (₹'+CFG.min*CFG.rate+') hai');
@@ -780,35 +782,27 @@ async function submit(amt,upi){
   if(!upi)return say('UPI ID / Account details daalo');
   busy=true;
   try{
-    var s=null;try{s=await sess()}catch(e){}
-    var used=null;if(s){try{used=await usedToday(s)}catch(e){}}
-    if(used===null)used=localUsed();
-    var rup=amt*CFG.rate;
-    if(used+rup>CFG.perDay)return say('Aaj ki limit ₹'+CFG.perDay.toLocaleString('en-IN')+'. Aaj bacha: ₹'+Math.max(0,CFG.perDay-used).toLocaleString('en-IN'));
+    var s=await sess();if(!s)return say('Login nahi hai. Google se login karo');
     var id='W'+Date.now().toString(36)+Math.random().toString(36).slice(2,4);
-    /* coins game se turant cut - server ka wait nahi */
-    S.bal=+(S.bal-amt).toFixed(2);
+    /* server khud balance check + atomic deduct karta hai */
+    var r=await sb().rpc('request_withdrawal',{p_coins:amt,p_upi:upi,p_id:id});
+    if(r.error)return say(friendly(r.error.message));
+    var rup=amt*CFG.rate;
     if(!S.wdHist)S.wdHist=[];
     S.tx.unshift({id:id,t:'Withdraw',a:-amt,d:Date.now()});S.tx=S.tx.slice(0,100);
-    var rec={id:id,amt:amt,upi:upi,d:Date.now(),status:'Processing'};
-    S.wdHist.unshift(rec);S.wdHist=S.wdHist.slice(0,50);
-    save();render();
-    var res='retry';try{res=await pushWd({id:id,amt:amt,upi:upi})}catch(e){}
-    if(res==='fatal'){S.bal=+(S.bal+amt).toFixed(2);rec.status='Rejected';
-      S.tx.unshift({id:'R'+Date.now().toString(36),t:'Withdraw failed - coins wapas',a:amt,d:Date.now()});
-      save();render();return say('Withdraw nahi ho paya (limit/minimum). Coins wapas mil gaye')}
-    if(res==='retry'){rec.status='Pending sync';(S.wdQ=S.wdQ||[]).push({id:id,amt:amt,upi:upi});
-      say('✔ '+amt+' coins cut ho gaye. Server connect hote hi request admin tak chali jayegi')}
-    else say('✔ '+amt+' coins = ₹'+rup+' withdraw request gayi');
-    save();render();
+    S.wdHist.unshift({id:id,amt:amt,upi:upi,d:Date.now(),status:'Processing'});S.wdHist=S.wdHist.slice(0,50);
+    save();
+    await syncWallet();
+    say('✔ '+amt+' coins = ₹'+rup+' withdraw request gayi');
     try{window.sub('wh')}catch(e){}
   }catch(e){say('Error: '+(e&&e.message||e))}finally{busy=false}}
 async function tick(){
-  try{if(!sb())return;if(!reg){if(!await register()){if(!tick.w){tick.w=1;say('Coins sync nahi ho raha: '+friendly(cache.regErr||'login/server check karo'))}return}}await flushQ();await claim();await syncWd()}catch(e){}}
-setTimeout(tick,1500);setInterval(tick,5000);
+  try{if(!sb())return;if(!reg){if(!await register()){if(!tick.w){tick.w=1;say('Coins sync nahi ho raha: '+friendly(cache.regErr||'login/server check karo'))}return}}
+    watchWallet();await syncWallet();await claim();await syncWd()}catch(e){}}
+setTimeout(tick,1500);setInterval(tick,15000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)tick()});
 
-/* ---------- ADMIN SIDE ---------- */
+/* ---------- ADMIN SIDE (server khud role check karta hai) ---------- */
 async function adminLoad(){
   try{
     var a=await sb().from('withdrawals').select('*').order('created_at',{ascending:false}).limit(100);
@@ -820,18 +814,13 @@ async function adminTransfer(){
   var u=normName(el('admUser')&&el('admUser').value),a=+(el('admCoins')&&el('admCoins').value);
   if(!u)return say('Username / Player ID daalo');
   if(!(a>0))return say('Coins daalo');
-  var p=await sb().from('players').select('username').eq('username',u).maybeSingle();
-  if(p.error){cache.err=p.error.message;say(friendly(p.error.message));return window.showAdminUI()}
-  if(!p.data)return say('"'+u+'" naam ka player nahi mila. Player ne game kam se kam ek baar khola hona chahiye.');
-  var r=await sb().from('coin_credits').insert({username:u,amount:a,note:'admin'});
+  var r=await sb().rpc('admin_transfer_coins',{p_username:u,p_amount:a});
   if(r.error){cache.err=r.error.message;say(friendly(r.error.message));return window.showAdminUI()}
   cache.err='';say('✔ '+a+' coins '+u+' ko bheje gaye');adminLoad()}
 async function adminWd(id,action){
-  var st=action==='ok'?'Approved':'Rejected';
-  var r=await sb().from('withdrawals').update({status:st}).eq('id',id).eq('status','Processing').select('id');
+  var r=await sb().rpc(action==='ok'?'approve_withdrawal':'reject_withdrawal',{p_id:id});
   if(r.error)return say(friendly(r.error.message));
-  if(!r.data||!r.data.length)return say('Ye request pehle hi process ho chuki hai');
-  say(st==='Approved'?'Withdraw Approved ✔':'Rejected - player ko coins wapas mil jayenge');adminLoad()}
+  say(action==='ok'?'Withdraw Approved ✔':'Rejected - player ko coins wapas mil jayenge');adminLoad()}
 var IN='width:100%;margin:8px 0;padding:12px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:16px;box-sizing:border-box';
 function errBox(){return cache.err?'<div style="background:#5a1a1a;border-radius:10px;padding:10px;margin:8px 0;font-size:12px">⚠ '+esc(friendly(cache.err))+'</div>':''}
 function adminUsersHTML(){
@@ -866,7 +855,7 @@ function adminWdHTML(){
     (all.length?all.map(function(x){var c=x.status==='Approved'?'#4be08a':x.status==='Rejected'?'#ff6b6b':'#ffd23f';
       return '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #ffffff12"><div>₹'+esc(x.rupees)+' <span style="opacity:.55">'+esc(x.username)+'</span><br><small style="opacity:.45">'+esc(x.upi)+'</small></div><span style="color:'+c+'">'+esc(x.status)+'</span></div>'}).join(''):'<div style="opacity:.5">No records</div>')+
     '</div></div>'}
-window.CoinSys={cache:cache,cfg:CFG,tick:tick,submit:submit,refreshUsed:refreshUsed,adminLoad:adminLoad,adminTransfer:adminTransfer,adminWd:adminWd,adminUsersHTML:adminUsersHTML,adminWdHTML:adminWdHTML,claimNow:claimNow};
+window.CoinSys={cache:cache,cfg:CFG,tick:tick,submit:submit,refreshUsed:refreshUsed,adminLoad:adminLoad,adminTransfer:adminTransfer,adminWd:adminWd,adminUsersHTML:adminUsersHTML,adminWdHTML:adminWdHTML,claimNow:claimNow,syncWallet:syncWallet};
 })();
 </script>
 
@@ -950,14 +939,13 @@ window.safeMove=dir=>{const v=+(+$('sfa').value).toFixed(2);if(!(v>0))return toa
  save();render();sub('safe')};
 const empty=t=>`<div class="card"><p class="note">${t}</p></div>`;
 
-window.doDeposit=function(){const amt=+document.getElementById("depAmt")?.value;if(!amt||amt<100)return toast("Minimum deposit ₹100 hai");if(amt>50000)return toast("Maximum ₹50,000 ek baar mein");S.bal=+(S.bal+amt).toFixed(2);S.tx.unshift({id:"D"+Date.now().toString(36),t:"Deposit",a:amt,d:Date.now()});if(!S.depHist)S.depHist=[];S.depHist.unshift({id:"D"+Date.now().toString(36),amt:amt,method:"UPI/Bank",d:Date.now(),status:"Success"});S.depHist=S.depHist.slice(0,50);S.tx=S.tx.slice(0,100);save();render();toast("₹"+amt+" deposit successful ✔");sub("dh")};
+
 window.doWithdraw=function(){const amt=+document.getElementById("wdAmt")?.value;const upi=document.getElementById("wdUpi")?.value?.trim();if(window.CoinSys)CoinSys.submit(amt,upi);else toast("Withdraw abhi available nahi")};
 
 
 /* ===== ADMIN PANEL ===== */
 
 /* ===== PROFESSIONAL ADMIN PANEL ===== */
-window.ADMIN_PASS = "admin123";
 window._adminOpen = false;
 window._adminTab = "dash";
 
@@ -968,13 +956,11 @@ function ensureAdmin(){
     avMin: 1.2,
     avMax: 8.0,
     avForce: null,
-    minDep: 100,
     minWd: 110,
     maint: false,
     notice: "Welcome to Colour Trading Pro"
   };
   if(!S.wdHist) S.wdHist = [];
-  if(!S.depHist) S.depHist = [];
   if(!S.tx) S.tx = [];
 }
 
@@ -1158,12 +1144,9 @@ function buildPreviewHTML(){
 
 window.openAdmin = async function(){
   ensureAdmin();
-  /* Pehle email check (chupke se): admin account nahi hai to kuch bhi nahi dikhega, password bhi nahi poochega */
-  var ADMIN_EMAIL = "bishalutujt@gmail.com", em = "";
-  try{ var r = await window.__sb.auth.getSession(); em = (r && r.data && r.data.session && r.data.session.user && r.data.session.user.email) || ""; }catch(e){}
-  if(em.toLowerCase() !== ADMIN_EMAIL) return;
-  const pass = prompt("Admin Password:");
-  if(pass !== ADMIN_PASS){ toast("Galat password"); return; }
+  /* Koi client-side password nahi. Panel koi bhi khol sakta hai, lekin saare admin actions
+     server-side RPCs (approve_withdrawal / reject_withdrawal / admin_transfer_coins) se hote hain,
+     jo server par admin role check karte hain. Non-admin ko NOT_ADMIN error milega. */
   window._adminOpen = true; _adminOpen = true;
   window._adminTab = "dash"; _adminTab = "dash";
   showAdminUI();
@@ -1183,12 +1166,11 @@ window.adminTab = function(t){
 };
 
 function adminStat(){
-  const dep = (S.depHist||[]).reduce((a,x)=>a+(x.amt||0),0);
   const _cw = window.CoinSys && CoinSys.cache.wd;
   const wd = _cw ? _cw.filter(x=>x.status==="Approved").reduce((a,x)=>a+(+x.rupees||0),0) : (S.wdHist||[]).filter(x=>x.status==="Approved").reduce((a,x)=>a+(x.amt||0),0);
   const pendingWd = _cw ? _cw.filter(x=>x.status==="Processing").length : (S.wdHist||[]).filter(x=>x.status==="Processing").length;
   const txN = (S.tx||[]).length;
-  return {bal:S.bal||0, dep, wd, pendingWd, txN, safe:S.safe||0};
+  return {bal:S.bal||0, wd, pendingWd, txN, safe:S.safe||0};
 }
 
 function showAdminUI(){
@@ -1197,14 +1179,12 @@ function showAdminUI(){
   const st = adminStat();
   const pendingWd = (S.wdHist||[]).filter(x=>x.status==="Processing");
   const allWd = (S.wdHist||[]).slice(0,30);
-  const allDep = (S.depHist||[]).slice(0,30);
   const txs = (S.tx||[]).slice(0,40);
 
   const tabs = [
     ["dash","📊 Dashboard"],
     ["preview","🔮 Live Preview"],
     ["users","👤 Users"],
-    ["dep","⬇️ Deposits"],
     ["wd","⬆️ Withdrawals"],
     ["game","🎮 Game Control"],
     ["set","⚙️ Settings"]
@@ -1223,10 +1203,6 @@ function showAdminUI(){
       <div style="background:linear-gradient(135deg,#2f8cff,#1a4a9a);border-radius:14px;padding:14px">
         <div style="font-size:12px;opacity:.85">Total Balance</div>
         <div style="font-size:26px;font-weight:900">₹${st.bal.toFixed(2)}</div>
-      </div>
-      <div style="background:linear-gradient(135deg,#17a85a,#0a6a3a);border-radius:14px;padding:14px">
-        <div style="font-size:12px;opacity:.85">Total Deposits</div>
-        <div style="font-size:26px;font-weight:900">₹${st.dep.toFixed(0)}</div>
       </div>
       <div style="background:linear-gradient(135deg,#e0922f,#a85a1a);border-radius:14px;padding:14px">
         <div style="font-size:12px;opacity:.85">Total Withdrawals</div>
@@ -1267,70 +1243,13 @@ function showAdminUI(){
         <div style="margin-top:4px">Safe: ₹${(S.safe||0).toFixed(2)}</div>
       </div>
     </div>
-    <div style="background:#12163d;border-radius:12px;padding:14px">
-      <b>💰 My Own Balance (sirf test ke liye)</b>
-      <input id="admAmt" type="number" placeholder="Amount" style="width:100%;margin:10px 0;padding:12px;border-radius:10px;border:0;background:#0a0f3d;color:#fff;font-size:16px">
-      <div style="display:flex;gap:8px">
-        <button onclick="adminGive(1)" style="flex:1;background:#17a85a;border:0;color:#fff;padding:12px;border-radius:10px;font-weight:700">+ Add Coins</button>
-        <button onclick="adminGive(-1)" style="flex:1;background:#d83a3a;border:0;color:#fff;padding:12px;border-radius:10px;font-weight:700">- Deduct</button>
-      </div>
-    </div>`;
+    `;
     body = (window.CoinSys ? CoinSys.adminUsersHTML() : '') + body;
-  }
-
-  // DEPOSITS
-  else if(_adminTab==="dep"){
-    body = `
-    <div style="background:#12163d;border-radius:12px;padding:12px;margin-bottom:12px">
-      <b>Manual Deposit Add</b>
-      <input id="admDepAmt" type="number" placeholder="Amount" style="width:100%;margin:8px 0;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
-      <button onclick="adminManualDep()" style="width:100%;background:#17a85a;border:0;color:#fff;padding:10px;border-radius:8px">Add Deposit</button>
-    </div>
-    <div style="background:#12163d;border-radius:12px;padding:12px">
-      <b>Deposit History</b>
-      <div style="max-height:340px;overflow:auto;margin-top:8px;font-size:13px">
-        ${allDep.length?allDep.map(x=>`<div style="padding:8px 0;border-bottom:1px solid #ffffff15;display:flex;justify-content:space-between">
-          <div>
-            <div style="font-weight:700">₹${x.amt}</div>
-            <div style="font-size:11px;opacity:.6">${new Date(x.d).toLocaleString()}</div>
-          </div>
-          <div style="color:#4be08a">${x.status||'Success'}</div>
-        </div>`).join(''):'<div style="opacity:.5;padding:10px 0">No deposits yet</div>'}
-      </div>
-    </div>`;
   }
 
   // WITHDRAWALS
   else if(_adminTab==="wd"){
-    if(window.CoinSys){ body = CoinSys.adminWdHTML(); } else
-    body = `
-    <div style="background:#12163d;border-radius:12px;padding:12px;margin-bottom:12px">
-      <b style="color:#ffd23f">⏳ Pending Requests (${pendingWd.length})</b>
-      <div style="margin-top:8px">
-        ${pendingWd.length?pendingWd.map((x,i)=>`
-          <div style="background:#0a0f3d;border-radius:10px;padding:12px;margin-bottom:8px">
-            <div style="display:flex;justify-content:space-between">
-              <b style="font-size:18px">₹${x.amt}</b>
-              <span style="font-size:12px;opacity:.6">${new Date(x.d).toLocaleString()}</span>
-            </div>
-            <div style="margin:6px 0;font-size:13px">UPI/Account: <b>${x.upi}</b></div>
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button onclick="adminWdById('${x.id}','ok')" style="flex:1;background:#17a85a;border:0;color:#fff;padding:10px;border-radius:8px;font-weight:700">✓ Accept</button>
-              <button onclick="adminWdById('${x.id}','no')" style="flex:1;background:#d83a3a;border:0;color:#fff;padding:10px;border-radius:8px;font-weight:700">✕ Reject</button>
-            </div>
-          </div>
-        `).join(''):'<div style="opacity:.5;padding:12px 0">No pending withdrawals</div>'}
-      </div>
-    </div>
-    <div style="background:#12163d;border-radius:12px;padding:12px">
-      <b>All Withdrawals</b>
-      <div style="max-height:240px;overflow:auto;margin-top:8px;font-size:12px">
-        ${allWd.map(x=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #ffffff12">
-          <div>₹${x.amt} <span style="opacity:.5">${x.upi||''}</span></div>
-          <span style="color:${x.status==='Approved'?'#4be08a':x.status==='Rejected'?'#ff6b6b':'#ffd23f'}">${x.status}</span>
-        </div>`).join('')||'<div style="opacity:.5">No records</div>'}
-      </div>
-    </div>`;
+    body = window.CoinSys ? CoinSys.adminWdHTML() : '<div style="background:#12163d;border-radius:12px;padding:14px">Loading…</div>';
   }
 
   // GAME CONTROL
@@ -1390,10 +1309,6 @@ function showAdminUI(){
       <b>⚙️ Limits</b>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
         <div>
-          <div style="font-size:12px;opacity:.7">Min Deposit</div>
-          <input id="admMinDep" type="number" value="${a.minDep||100}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
-        </div>
-        <div>
           <div style="font-size:12px;opacity:.7">Min Withdraw</div>
           <input id="admMinWd" type="number" value="${a.minWd||110}" style="width:100%;padding:10px;border-radius:8px;border:0;background:#0a0f3d;color:#fff">
         </div>
@@ -1407,7 +1322,7 @@ function showAdminUI(){
     </div>
     <div style="background:#12163d;border-radius:12px;padding:14px">
       <b>🔐 Security</b>
-      <button onclick="adminChangePass()" style="width:100%;margin-top:10px;background:#333;border:0;color:#fff;padding:11px;border-radius:8px">Change Admin Password</button>
+      <div style="font-size:12px;opacity:.7;margin-top:4px">Admin access server par role se control hota hai. Koi password nahi.</div>
       <button onclick="if(confirm('Sab data reset?')){localStorage.removeItem('ctp');location.reload()}" style="width:100%;margin-top:8px;background:#d83a3a;border:0;color:#fff;padding:11px;border-radius:8px">Reset All Game Data</button>
     </div>`;
   }
@@ -1442,40 +1357,6 @@ function showAdminUI(){
 }
 window.showAdminUI = showAdminUI;
 
-window.adminGive = function(dir){
-  const amt = +document.getElementById("admAmt")?.value;
-  if(!amt||amt<=0) return toast("Amount daalo");
-  S.bal = Math.max(0, +(S.bal + dir*amt).toFixed(2));
-  S.tx.unshift({id:"A"+Date.now().toString(36),t:dir>0?"Admin Credit":"Admin Debit",a:dir*amt,d:Date.now()});
-  S.tx=S.tx.slice(0,100); save(); render();
-  toast((dir>0?"+":"-")+"₹"+amt); showAdminUI();
-};
-
-window.adminManualDep = function(){
-  const amt = +document.getElementById("admDepAmt")?.value;
-  if(!amt||amt<=0) return toast("Amount daalo");
-  S.bal = +(S.bal+amt).toFixed(2);
-  if(!S.depHist) S.depHist=[];
-  S.depHist.unshift({id:"D"+Date.now().toString(36),amt,method:"Manual",d:Date.now(),status:"Success"});
-  S.tx.unshift({id:"D"+Date.now().toString(36),t:"Manual Deposit",a:amt,d:Date.now()});
-  save(); render(); toast("₹"+amt+" deposited"); showAdminUI();
-};
-
-window.adminWdById = function(id, action){
-  const item = (S.wdHist||[]).find(x=>x.id===id);
-  if(!item) return;
-  if(action==="ok"){
-    item.status="Approved";
-    toast("Withdraw Approved ✔");
-  } else {
-    item.status="Rejected";
-    S.bal=+(S.bal+item.amt).toFixed(2);
-    S.tx.unshift({id:"R"+Date.now().toString(36),t:"WD Rejected Refund",a:item.amt,d:Date.now()});
-    toast("Rejected + Refunded");
-  }
-  save(); render(); showAdminUI();
-};
-
 window.adminForceColour = function(n){
   ensureAdmin();
   S.admin.forceColour = n;
@@ -1495,7 +1376,6 @@ window.adminSaveAv = function(){
 
 window.adminSaveLimits = function(){
   ensureAdmin();
-  S.admin.minDep = +document.getElementById("admMinDep")?.value || 100;
   S.admin.minWd = +document.getElementById("admMinWd")?.value || 110;
   save(); toast("Limits saved");
 };
@@ -1504,13 +1384,6 @@ window.adminSaveNotice = function(){
   ensureAdmin();
   S.admin.notice = document.getElementById("admNotice")?.value || "";
   save(); toast("Notice saved");
-};
-
-window.adminChangePass = function(){
-  const n = prompt("Naya Admin Password:");
-  if(!n||n.length<4) return toast("Minimum 4 character");
-  ADMIN_PASS = n;
-  toast("Password change ho gaya (is session ke liye)");
 };
 
 // Aviator crash helper
@@ -1544,10 +1417,10 @@ notif:['Notification',()=>`<div class="card"><b>Welcome 🎉</b><p class="note" 
 gift:['Gifts',()=>empty('Abhi koi gift nahi hai')],
 cpn:['My Top-Up Coupons',()=>empty('Abhi koi coupon nahi hai')],
 stat:['Game statistics',()=>{const t=S.st,r=t.n?Math.round(t.w/t.n*100):0,net=t.won-t.entry;return `<div class="kv"><div class="card">Predictions<b>${t.n}</b></div><div class="card">Wins<b style="color:#4be08a">${t.w}</b></div><div class="card">Losses<b style="color:#ff6b6b">${t.n-t.w}</b></div><div class="card">Win rate<b>${r}%</b></div><div class="card">Total entry<b>₹${f2(t.entry)}</b></div><div class="card">Total reward<b>₹${f2(t.won)}</b></div></div><div class="card" style="margin-top:12px;text-align:center">Net<b style="display:block;font-size:24px;color:${net>=0?'#4be08a':'#ff6b6b'}">${net>=0?'+':''}₹${f2(net)}</b></div>`}],
-dep:['Deposit',()=>`<div class="card"><p class="note" style="text-align:left">Minimum deposit ₹100. Instant credit (simulated).</p><input class="inp" id="depAmt" type="number" min="100" placeholder="Enter amount (₹)"><div class="row" style="margin-top:10px"><button class="g" style="flex:1" onclick="doDeposit()">UPI</button><button class="sm" style="flex:1" onclick="doDeposit()">Bank</button></div><button class="gold" style="width:100%;margin-top:10px" onclick="doDeposit()">Confirm Deposit</button></div>`],
+dep:['Deposit',()=>`<div class="card"><p class="note" style="text-align:left">Deposit abhi available nahi hai. Coins sirf admin transfer se milte hain — jald hi payment gateway judenga.</p></div>`],
 wd:['Withdraw',()=>{setTimeout(()=>{try{CoinSys.refreshUsed()}catch(e){}},80);const C=window.WD_CFG||{min:110,perDay:50000,rate:1,tiers:[110,200,500]};return `<div class="card"><b>🪙 Coins → ₹ Rupees</b><p class="note" style="text-align:left">1 Coin = ₹${C.rate} · Minimum ${C.min} coins · Max ₹${C.perDay.toLocaleString('en-IN')} per day. Withdraw karte hi coins game balance se cut ho jate hain.</p><table><tr><th>Coins</th><th>Rupees</th><th></th></tr>${C.tiers.map((t,i)=>`<tr style="opacity:${S.bal>=t?1:.45}"><td>🪙 ${t.toLocaleString('en-IN')}</td><td class="win">₹${(t*C.rate).toLocaleString('en-IN')}</td><td>${i==0?'<small style="color:#ffd23f">Minimum</small> ':''}<button style="padding:5px 10px;font-size:12px" onclick="document.getElementById('wdAmt').value=${t}">Select</button></td></tr>`).join('')}</table><p class="note">Aapke coins: <b>${S.bal.toLocaleString('en-IN')}</b> · Aaj withdraw kiya: <b id="wdUsed">…</b> / ₹${C.perDay.toLocaleString('en-IN')}</p><input class="inp" id="wdAmt" type="number" min="${C.min}" placeholder="Kitne coins redeem karne hain (min ${C.min})"><input class="inp" id="wdUpi" placeholder="UPI ID / Account details"><button class="gold" style="width:100%;margin-top:10px" onclick="doWithdraw()">Confirm Withdraw</button><p class="note">Reject hone par coins wapas aapke balance me aa jate hain.</p></div>`}],
-dh:['Deposit history',()=>{if(!S.depHist||!S.depHist.length)return empty('No deposit records yet');return `<div class="card"><table><tr><th>ID</th><th>Amount</th><th>Status</th><th>Date</th></tr>${S.depHist.map(x=>`<tr><td style="font-size:11px">${x.id}</td><td class="win">+₹${x.amt}</td><td>${x.status}</td><td style="font-size:11px">${new Date(x.d).toLocaleString()}</td></tr>`).join('')}</table></div>`}],
-wh:['Withdraw history',()=>{if(!S.wdHist||!S.wdHist.length)return empty('No withdraw records yet');return `<div class="card"><table><tr><th>ID</th><th>Amount</th><th>UPI</th><th>Status</th></tr>${S.wdHist.map(x=>`<tr><td style="font-size:11px">${x.id}</td><td class="lose">-₹${x.amt}</td><td style="font-size:11px">${x.upi}</td><td>${x.status}</td></tr>`).join('')}</table></div>`}],
+dh:['Deposit history',()=>empty('No deposit records yet')],
+wh:['Withdraw history',()=>{if(!S.wdHist||!S.wdHist.length)return empty('No withdraw records yet');const eh=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));return `<div class="card"><table><tr><th>ID</th><th>Amount</th><th>UPI</th><th>Status</th></tr>${S.wdHist.map(x=>`<tr><td style="font-size:11px">${eh(x.id)}</td><td class="lose">-₹${eh(x.amt)}</td><td style="font-size:11px">${eh(x.upi)}</td><td>${eh(x.status)}</td></tr>`).join('')}</table></div>`}],
 vip:['VIP',()=>{const l=vipL(),e=S.st.entry,nx=VL[l],pr=nx?Math.min(100,Math.round((e-VL[l-1])/(nx-VL[l-1])*100)):100;return `<div class="card" style="text-align:center"><div style="font-size:30px;font-weight:800">★ VIP${l}</div><div class="pgb"><i style="width:${pr}%"></i></div><small style="color:var(--mut)">Total entry ₹${f2(e)}${nx?' / ₹'+nx.toLocaleString():' (max level)'}</small></div>`}],
 safe:['Safe',()=>`<div class="card" style="text-align:center"><small style="color:var(--mut)">Safe balance</small><div style="font-size:30px;font-weight:800;margin:6px 0">₹${f2(S.safe)}</div><p class="note">Daily interest 0.1%, har 1 minute me add hota hai.</p><input class="inp" id="sfa" type="number" min="0" placeholder="Amount"><div class="row"><button onclick="safeMove(1)">Move in</button><button class="gold" onclick="safeMove(-1)">Move out</button></div></div>`],
 set:['Settings',()=>`<div class="card top"><span>Sound</span><button onclick="togMute()" style="min-width:70px">${S.mute?'OFF':'ON'}</button></div><div class="card" style="margin-top:10px;text-align:center"><canvas class="i3" data-i="tg" width="128" height="128" style="width:64px;height:64px;margin:0 auto 6px"></canvas><b style="display:block;color:#cfe2ff">Help &amp; Support</b><p class="note">Telegram: @Luffyxzoroa</p><a href="https://t.me/Luffyxzoroa" target="_blank" rel="noopener noreferrer" style="display:block;background:#3f8cff;color:#fff;padding:12px;border-radius:12px;font-weight:700;text-decoration:none">✈️ Open Telegram</a></div><button class="r" style="width:100%;margin-top:10px" onclick="resetAll()">Reset data</button><button class="r" style="width:100%;margin-top:10px;background:#475569" onclick="ctpLogout()">Logout</button>`],
@@ -4213,7 +4086,7 @@ function sHist(){sh('<h3>Bet History '+X+'</h3>'+(V.hist.length?V.hist.map(h=>{c
 function mount(){if(root)return;root=$('vx');root.innerHTML='<div class="vx-t"><button class="bk" id="vxBk" aria-label="Back">‹</button><div class="vx-bal"><i>₹</i><b id="vxBal">0</b><button id="vxPl" aria-label="Deposit">+</button></div></div><div class="vx-s"><span id="vxW"></span><span><button id="vxHp" aria-label="Help">?</button><button id="vxSn" aria-label="Sound">🔊</button><button id="vxSt" aria-label="Settings">⚙</button><button id="vxHi" aria-label="History">🕘</button></span></div><div class="vx-logo"><svg viewBox="0 0 300 70"><defs><linearGradient id="vxLg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".55" stop-color="#b9bccf"/><stop offset="1" stop-color="#6c7088"/></linearGradient></defs><ellipse cx="150" cy="38" rx="138" ry="21" fill="none" stroke="#8a3dff" stroke-width="9" stroke-linecap="round" stroke-dasharray="330 90" transform="rotate(-7 150 38)" opacity=".9"/><text x="150" y="53" text-anchor="middle" font-family="Trebuchet MS,system-ui" font-style="italic" font-weight="900" font-size="46" letter-spacing="3" fill="url(#vxLg)" stroke="#23242f" stroke-width="1.5" paint-order="stroke">VORTEX</text></svg></div><div class="vx-stage"><canvas id="vxCv"></canvas><div class="vx-bn" id="vxBn"></div></div><div class="vx-bet"><button class="o" id="vxM" aria-label="Decrease bet">−</button><div><small>Bet Amount ⓘ</small><b id="vxAmt"></b></div><button class="o" id="vxP2" aria-label="Increase bet">+</button></div><div class="vx-r"><button class="vx-c" id="vxCo">CASH<br>OUT</button><button class="vx-go" id="vxGo" aria-label="Hold to spin"><svg class="rg" viewBox="0 0 120 120"><defs><path id="vxCp" d="M60 60m-45 0a45 45 0 1 1 90 0a45 45 0 1 1-90 0"/></defs><text font-size="10" font-weight="800"><textPath href="#vxCp" textLength="280" lengthAdjust="spacing">HOLD TO SPIN • HOLD TO SPIN • </textPath></text></svg><svg class="sw" viewBox="0 0 64 64"><path d="M32 32c0-4 4-6 7-4s3 8-2 10-12-1-12-9 8-14 17-12 15 12 11 21" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg></button><button class="vx-c p" id="vxPa">PART<br>PAYOUT</button></div><div class="vx-pay"><div>Payout<b id="vxPay"></b></div><div>Part Payout<b id="vxPP"></b></div></div><div class="vx-ft"><span id="vxFt"></span><span id="vxClk"></span></div><div class="vx-sh" id="vxSh"></div>';
  cv=$('vxCv');cx=cv.getContext('2d');const on=(i,f)=>$(i).onclick=f;on('vxBk',()=>close());on('vxCo',()=>cash());on('vxPa',part);on('vxM',()=>stepBet(-1));on('vxP2',()=>stepBet(1));on('vxAmt',()=>{if(!V.round&&!busy)sPre()});on('vxHp',sHelp);on('vxSt',sSet);on('vxHi',sHist);on('vxSn',()=>{V.mute=V.mute?0:1;sv();ui()});
  const go=$('vxGo');go.addEventListener('pointerdown',e=>{e.preventDefault();hold=1;spin()});['pointerup','pointercancel','pointerleave'].forEach(n=>go.addEventListener(n,()=>{hold=0}));go.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();if(!e.repeat){hold=1;spin()}}});go.addEventListener('keyup',()=>{hold=0});go.oncontextmenu=e=>e.preventDefault();
- on('vxPl',()=>{if(close(1))try{window.sub('dep')}catch(e){}});$('vxSh').onclick=e=>{if(e.target.id==='vxSh')shX()};try{new ResizeObserver(build).observe(cv)}catch(e){addEventListener('resize',build)}
+ on('vxPl',()=>{if(close(1))try{window.sub('wd')}catch(e){}});$('vxSh').onclick=e=>{if(e.target.id==='vxSh')shX()};try{new ResizeObserver(build).observe(cv)}catch(e){addEventListener('resize',build)}
  Vortex._x=shX;Vortex._b=v=>{setBet(v);shX()};Vortex._t=k=>{V[k]=V[k]?0:1;sv();ui();sSet()}}
 function openG(){if(!st())return;mount();recover();open=1;root.classList.add('on');document.body.style.overflow='hidden';W=0;build();ang=[0,0,0];ico=null;hold=0;setBet(V.bet);ui();cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);clearInterval(tmr);const clk=()=>{$('vxClk').textContent=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})};clk();tmr=setInterval(clk,1000)}
 function close(q){if(busy){toast('Spin chal raha hai…');return false}hold=0;const r=V&&V.round;if(r){if(pot(r)>0){cash(true);toast('Payout auto cash-out ho gaya')}else fin('end')}open=0;cancelAnimationFrame(raf);clearInterval(tmr);root.classList.remove('on');document.body.style.overflow='';shX();if(!q)try{window.show('home')}catch(e){}return true}
