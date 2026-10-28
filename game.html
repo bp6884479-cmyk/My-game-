@@ -3,8 +3,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 (function(){
-var SB=supabase.createClient("https://msywestunkdbbvvkrldr.supabase.co","sb_publishable__LBthp6EoyaXl-nN3YvRuA_BhhHoTyd");
+var SB=supabase.createClient("https://msywestunkdbbvvkrldr.supabase.co","sb_publishable__LBthp6EoyaXl-nN3YvRuA_BhhHoTyd",{
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
 window.__sb=SB;
+var _authStarted = false;
+try {
+  SB.auth.onAuthStateChange(function(evt, session){
+    if((evt === "SIGNED_IN" || evt === "INITIAL_SESSION" || evt === "TOKEN_REFRESHED") && session && session.user && !_authStarted){
+      _authStarted = true;
+      loadAndStart(session);
+    }
+  });
+} catch(e){}
 function isGame(k){return k.indexOf("sb-")!==0&&k.indexOf("ctp_")!==0}
 function snap(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(isGame(k))o[k]=localStorage.getItem(k)||""}return o}
 function clearG(){Object.keys(snap()).forEach(function(k){localStorage.removeItem(k)})}
@@ -55,6 +66,7 @@ d.innerHTML='<style>#ctpLogin .w{position:fixed;inset:0;z-index:99999;background
 '<button id="ctpGo" class="bt go"><span class="ic"><svg width="32" height="32" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg></span><span class="t"><b>Login with Google</b><small>Fast &amp; Secure</small></span><em>›</em></button>'+
 '<div class="ft"><div><i>🛡️</i>Safe &amp; Secure</div><div><i>⚡</i>Fast Gameplay</div><div><i>📊</i>Real Strategy</div><div><i>🏆</i>Be the Best</div></div><p id="ctpErr"></p></div><div class="gl">— GOOD LUCK! —</div></div>';
 document.body.appendChild(d);try{logo3d()}catch(e){}
+function msg(t){ var e=document.getElementById("ctpErr"); if(e) e.textContent=t||""; }
 document.getElementById("ctpGo").onclick=async function(){msg("...");try{wipe();clearG();var r=await SB.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.href.split("#")[0],queryParams:{prompt:"select_account"}}});if(r.error)msg(r.error.message||"Google login fail")}catch(e){msg(String(e&&e.message||e))}};
 }
 
@@ -134,29 +146,36 @@ loop();
 }
 window.ctpLogout=async function(){showLoad("Logging out...");try{await Promise.race([save(),new Promise(function(r){setTimeout(r,800)})])}catch(e){}try{await SB.auth.signOut()}catch(e){}try{localStorage.clear()}catch(e){}try{sessionStorage.clear()}catch(e){}location.replace("./?logout="+Date.now())};
 document.addEventListener("DOMContentLoaded", async function(){
+  if(_authStarted) return;
   // Check if returning from Google OAuth (URL hash contains tokens)
   var hasOAuthHash = location.hash && (location.hash.indexOf("access_token=") > -1 || location.hash.indexOf("refresh_token=") > -1);
   if(hasOAuthHash){
     showLoad("Authenticating with Google...");
     try {
       var sessRes = null;
-      for(var tries=0; tries<3 && !(sessRes && sessRes.data && sessRes.data.session); tries++){
-        try{ sessRes = await T(SB.auth.getSession(), 8000); }catch(e){}
+      for(var tries=0; tries<5 && !(sessRes && sessRes.data && sessRes.data.session); tries++){
+        try{ sessRes = await T(SB.auth.getSession(), 15000); }catch(e){}
+        if(sessRes && sessRes.data && sessRes.data.session) break;
+        await new Promise(function(r){ setTimeout(r, 600); });
       }
       if(!(sessRes && sessRes.data && sessRes.data.session)){
         /* getSession atak gaya to URL ke tokens se seedha session banao */
         var hp = new URLSearchParams(location.hash.replace(/^#/, ""));
         var at = hp.get("access_token"), rt = hp.get("refresh_token");
-        if(at && rt){ try{ sessRes = await T(SB.auth.setSession({access_token:at, refresh_token:rt}), 10000); }catch(e){} }
+        if(at && rt){ try{ sessRes = await T(SB.auth.setSession({access_token:at, refresh_token:rt}), 20000); }catch(e){} }
       }
       if(sessRes && sessRes.data && sessRes.data.session){
-        await loadAndStart(sessRes.data.session);
-        return;
+        if(!_authStarted){
+          _authStarted = true;
+          await loadAndStart(sessRes.data.session);
+          return;
+        }
       }
     } catch(e) {
       console.warn("OAuth session fetch error:", e);
     }
   }
+  if(_authStarted) return;
 
   // Check stored Supabase session
   var session = null;
