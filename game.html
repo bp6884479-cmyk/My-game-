@@ -1146,9 +1146,9 @@ window.ADMIN_EMAILS = ["tghubd334@gmail.com"];
 
 window.getAdminEmail = async function(){
   try {
-    var sb = window.__sb;
-    if(!sb) return null;
-    var res = await sb.auth.getSession();
+    var client = window.__sb || window.SB;
+    if(!client) return null;
+    var res = await client.auth.getSession();
     var s = res && res.data && res.data.session;
     return (s && s.user && s.user.email ? s.user.email.toLowerCase().trim() : null);
   } catch(e) {
@@ -1204,8 +1204,8 @@ function adminStat(){
 
 function showAdminUI(){
   if(!window._adminOpen){
-    var el = document.getElementById("adminPanel");
-    if(el) el.remove();
+    const panel = document.getElementById("adminPanel");
+    if(panel) panel.remove();
     return;
   }
   ensureAdmin();
