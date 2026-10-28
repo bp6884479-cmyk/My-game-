@@ -1142,13 +1142,42 @@ function buildPreviewHTML(){
   return html;
 }
 
+window.ADMIN_EMAILS = ["tghubd334@gmail.com"];
+
+window.getAdminEmail = async function(){
+  try {
+    var sb = window.__sb;
+    if(!sb) return null;
+    var res = await sb.auth.getSession();
+    var s = res && res.data && res.data.session;
+    return (s && s.user && s.user.email ? s.user.email.toLowerCase().trim() : null);
+  } catch(e) {
+    return null;
+  }
+};
+
 window.openAdmin = async function(){
+  var email = await window.getAdminEmail();
+  var isAdmin = Boolean(email && window.ADMIN_EMAILS.some(function(adm){
+    return adm.toLowerCase().trim() === email;
+  }));
+
+  if(!isAdmin){
+    window._adminOpen = false;
+    if(typeof _adminOpen !== 'undefined') _adminOpen = false;
+    var el = document.getElementById("adminPanel");
+    if(el) el.remove();
+    var msg = email
+      ? "⛔ Access Denied! ('" + email + "') admin account nahi hai. Admin panel sirf " + window.ADMIN_EMAILS.join(", ") + " ke liye authorized hai."
+      : "⛔ Access Denied! Admin panel open karne ke liye pehle admin Google account se login karein.";
+    if(typeof window.toast === "function") window.toast(msg);
+    else alert(msg);
+    return;
+  }
+
   ensureAdmin();
-  /* Koi client-side password nahi. Panel koi bhi khol sakta hai, lekin saare admin actions
-     server-side RPCs (approve_withdrawal / reject_withdrawal / admin_transfer_coins) se hote hain,
-     jo server par admin role check karte hain. Non-admin ko NOT_ADMIN error milega. */
-  window._adminOpen = true; _adminOpen = true;
-  window._adminTab = "dash"; _adminTab = "dash";
+  window._adminOpen = true; if(typeof _adminOpen !== 'undefined') _adminOpen = true;
+  window._adminTab = "dash"; if(typeof _adminTab !== 'undefined') _adminTab = "dash";
   showAdminUI();
   if(window.CoinSys) CoinSys.adminLoad();
 };
@@ -1174,6 +1203,11 @@ function adminStat(){
 }
 
 function showAdminUI(){
+  if(!window._adminOpen){
+    var el = document.getElementById("adminPanel");
+    if(el) el.remove();
+    return;
+  }
   ensureAdmin();
   const a = S.admin;
   const st = adminStat();
@@ -1330,7 +1364,7 @@ function showAdminUI(){
   const html = `
   <div id="adminPanel" style="position:fixed;inset:0;z-index:99999;background:#070a2a;display:flex;flex-direction:column;font-family:system-ui,sans-serif;color:#fff">
     <div style="background:linear-gradient(180deg,#1a1f6a,#12163d);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff15">
-      <div style="font-weight:900;font-size:18px">👑 Admin Panel</div>
+      <div style="font-weight:900;font-size:18px;display:flex;align-items:center;gap:8px">👑 Admin Panel <span style="font-size:11px;font-weight:600;opacity:.85;background:#17a85a;padding:2px 8px;border-radius:12px;letter-spacing:0.3px">tghubd334@gmail.com</span></div>
       <button onclick="closeAdmin()" style="background:#ff3b5c;border:0;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px">✕</button>
     </div>
     <div style="display:flex;overflow-x:auto;background:#0d1140;padding:8px;gap:6px;border-bottom:1px solid #ffffff10">
